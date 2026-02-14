@@ -9,7 +9,6 @@ import { RoleAccess } from "@/components/landing/role-access";
 import { AIInsights } from "@/components/landing/ai-insights";
 import { Transparency } from "@/components/landing/transparency";
 import { Testimonials } from "@/components/landing/testimonials";
-import { Pricing } from "@/components/landing/pricing";
 import { FinalCTA } from "@/components/landing/final-cta";
 import { Footer } from "@/components/landing/footer";
 
@@ -25,7 +24,6 @@ export default function LandingPage() {
       <AIInsights />
       <Transparency />
       <Testimonials />
-      <Pricing />
       <FinalCTA />
       <Footer />
     </div>
