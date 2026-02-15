@@ -31,6 +31,7 @@ const trendData = [
     { day: "Sun", time: 1.8 },
 ];
 
+
 export function AnalyticsCharts({ departmentData, sentimentData }: AnalyticsChartsProps) {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -145,42 +146,58 @@ export function AnalyticsCharts({ departmentData, sentimentData }: AnalyticsChar
             </div>
 
             {/* Subject Feedback Performance Bar Chart */}
-            <div className="rounded-3xl border border-border bg-card p-6 min-h-[300px]">
-                <div className="flex items-center justify-between mb-6">
+            <div className="lg:col-span-2 rounded-3xl border border-border bg-card p-6 min-h-[300px]">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                        <BarChart3 className="h-5 w-5" />
+                    </div>
                     <div>
                         <h3 className="text-base font-bold">Subject Feedback</h3>
                         <p className="text-xs text-foreground/80">Student Ratings (Avg)</p>
                     </div>
-                    <TrendingUp className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="h-[200px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={[
-                            { subject: "Data Structures", rating: 4.8 },
-                            { subject: "Algorithms", rating: 4.5 },
-                            { subject: "Database", rating: 4.2 },
-                            { subject: "OS", rating: 4.7 },
-                        ]} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
-                            <XAxis type="number" domain={[0, 5]} hide />
-                            <YAxis
+                        <BarChart
+                            data={[
+                                { subject: "Data Structures", rating: 4.8 },
+                                { subject: "Algorithms", rating: 4.5 },
+                                { subject: "Database", rating: 4.2 },
+                                { subject: "OS", rating: 4.7 },
+                            ]}
+                            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(125,133,144,0.1)" vertical={false} />
+                            <XAxis
                                 dataKey="subject"
-                                type="category"
+                                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                                width={90}
+                                tickMargin={10}
+                            />
+                            <YAxis
+                                domain={[0, 5]}
+                                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                                axisLine={false}
+                                tickLine={false}
                             />
                             <Tooltip
-                                cursor={{ fill: "hsl(var(--muted)/0.2)" }}
-                                contentStyle={{ borderRadius: "12px", border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))", color: "hsl(var(--foreground))" }}
+                                contentStyle={{
+                                    backgroundColor: "var(--card)",
+                                    borderColor: "var(--border)",
+                                    borderRadius: "12px",
+                                    fontSize: "12px",
+                                    boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+                                    color: "var(--foreground)"
+                                }}
+                                cursor={{ fill: "var(--primary)", opacity: 0.1, radius: 4 }}
                             />
                             <Bar
                                 dataKey="rating"
-                                fill="hsl(var(--primary))"
-                                radius={4}
-                                barSize={20}
-                                background={{ fill: "hsl(var(--muted)/0.2)", radius: 4 }}
+                                fill="var(--primary)"
+                                radius={[6, 6, 0, 0]}
+                                barSize={40}
+                                animationDuration={1500}
                             />
                         </BarChart>
                     </ResponsiveContainer>
