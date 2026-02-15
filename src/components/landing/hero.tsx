@@ -8,7 +8,6 @@ import {
   ThumbsUp,
   CheckCircle,
   Clock,
-  TrendingUp,
   Zap,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
