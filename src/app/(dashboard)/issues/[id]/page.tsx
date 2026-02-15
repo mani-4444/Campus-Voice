@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -21,39 +21,21 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Timeline } from "@/components/timeline";
 import { AdminChat } from "@/components/admin-chat";
-
-// Mock data - in a real app this would come from an API based on params.id
-const timelineSteps = [
-  { label: "Submitted", date: "Feb 12, 2026 - 09:14 AM", completed: true, current: false, description: "Issue reported and added to anonymous queue" },
-  { label: "Under Review", date: "Feb 12, 2026 - 11:30 AM", completed: true, current: false, description: "Assigned to Facilities Management department" },
-  { label: "In Progress", date: "Feb 13, 2026 - 02:15 PM", completed: true, current: true, description: "Maintenance team dispatched to site" },
-  { label: "Resolved", date: "Pending", completed: false, current: false, description: "Awaiting resolution confirmation" },
-];
-
-const adminUpdates = [
-  { author: "System", message: "Issue #001 submitted and recorded in anonymous queue. Auto-priority: High based on keywords 'AC', 'Library'.", time: "Feb 12, 2026 - 09:14 AM", type: "system" },
-  { author: "Ravi (Facilities)", message: "Issue assigned to Facilities Management department for review. Reference ticket created: FM-2026-0212.", time: "Feb 12, 2026 - 11:30 AM", type: "assign" },
-  { author: "Suresh (Maintenance)", message: "Maintenance team dispatched to Block A Library. Estimated resolution time provided: 48 hours.", time: "Feb 13, 2026 - 02:15 PM", type: "update" },
-  { author: "Ravi (Facilities)", message: "Parts ordered for AC unit replacement (Compressor Unit XJ-900). Vendor: CoolTech Systems. Will update when parts arrive.", time: "Feb 14, 2026 - 10:00 AM", type: "update" },
-];
-
-const issues = [
-  { id: 1, reporter: "student" },
-  { id: 2, reporter: "student" },
-  { id: 3, reporter: "faculty" },
-  { id: 4, reporter: "student" },
-  { id: 5, reporter: "faculty" },
-  { id: 6, reporter: "student" },
-  { id: 7, reporter: "student" },
-  { id: 8, reporter: "faculty" },
-];
+import {
+  getIssueById,
+  getTimelineForIssue,
+  getUpdatesForIssue,
+} from "@/lib/mock/issues";
+import { useApp } from "@/components/app-context";
 
 export default function IssueDetailPage() {
   const params = useParams<{ id: string }>();
   const issueId = Number(params.id);
-  const issueReporter = issues.find((issue) => issue.id === issueId)?.reporter ?? "student";
+  const issue = getIssueById(issueId);
+  const issueTimeline = getTimelineForIssue(issueId);
+  const issueAdminUpdates = getUpdatesForIssue(issueId);
   const [upvoted, setUpvoted] = useState(false);
-  const [upvoteCount, setUpvoteCount] = useState(47);
+  const [upvoteCount, setUpvoteCount] = useState(issue?.upvotes ?? 0);
 
   const [showReportFalse, setShowReportFalse] = useState(false);
   const [falseReason, setFalseReason] = useState("");
@@ -61,24 +43,20 @@ export default function IssueDetailPage() {
   const [showResolve, setShowResolve] = useState(false);
   const [resolveNote, setResolveNote] = useState("");
 
-  const [role, setRole] = useState("student");
+  const { role } = useApp();
   const [adminUpdateText, setAdminUpdateText] = useState("");
 
-  // Mock reporter type for this issue. In a real app this comes from the issue data.
-  const reporter = issueReporter; // "student" | "faculty"
-  const issueReporterId = reporter === "faculty" ? "faculty-001" : "student-001";
+  const reporter = issue?.reporter ?? "student";
+  const issueReporterId =
+    reporter === "faculty" ? "faculty-001" : "student-001";
   const currentUserId = role === "faculty" ? "faculty-001" : "student-001";
   const isIssueOwner = role === reporter && currentUserId === issueReporterId;
-  const canUpvote = role !== "admin" && !(role === "faculty" && reporter === "student");
+  const canUpvote =
+    role !== "admin" && !(role === "faculty" && reporter === "student");
   const canResolve =
     role === "admin" ||
     (reporter === "student" && role === "student") ||
     (reporter === "faculty" && role === "faculty" && isIssueOwner);
-
-  useEffect(() => {
-    const savedRole = localStorage.getItem("app-role");
-    if (savedRole) setRole(savedRole);
-  }, []);
 
   const handleUpvote = () => {
     setUpvoted(!upvoted);
@@ -93,7 +71,10 @@ export default function IssueDetailPage() {
         animate={{ opacity: 1, x: 0 }}
         className="flex items-center justify-between"
       >
-        <Link href="/issues" className="group inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+        <Link
+          href="/issues"
+          className="group inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
           <div className="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-colors">
             <ArrowLeft className="h-4 w-4" strokeWidth={2} />
           </div>
@@ -125,34 +106,43 @@ export default function IssueDetailPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-4 flex-wrap">
               <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                In Progress
+                {issue?.status ?? "Unknown"}
               </span>
               <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--warning)] px-2.5 py-1 rounded-md bg-[var(--warning)]/10 border border-[var(--warning)]/20 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
-                High Priority
+                {issue?.priority ?? "—"} Priority
               </span>
-              <span className="text-[10px] text-muted-foreground/60 font-mono bg-muted/50 px-2 py-1 rounded-md border border-border/50">ID: #001</span>
+              <span className="text-[10px] text-muted-foreground/60 font-mono bg-muted/50 px-2 py-1 rounded-md border border-border/50">
+                ID: #{String(issueId).padStart(3, "0")}
+              </span>
             </div>
 
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-6 leading-tight">
-              Library AC not functioning in <span className="text-primary">Block A</span>
+              {issue?.title ?? "Issue not found"}
             </h1>
 
             <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5 bg-muted/30 px-3 py-1.5 rounded-full border border-border/50">
                 <Tag className="h-3.5 w-3.5 text-primary" strokeWidth={1.5} />
-                <span className="font-medium text-foreground">Infrastructure</span>
+                <span className="font-medium text-foreground">
+                  {issue?.category ?? "—"}
+                </span>
               </div>
               <div className="flex items-center gap-1.5 bg-muted/30 px-3 py-1.5 rounded-full border border-border/50">
-                <MapPin className="h-3.5 w-3.5 text-primary" strokeWidth={1.5} />
-                <span className="font-medium text-foreground">Block A</span>
+                <MapPin
+                  className="h-3.5 w-3.5 text-primary"
+                  strokeWidth={1.5}
+                />
+                <span className="font-medium text-foreground">
+                  {issue?.location ?? "—"}
+                </span>
               </div>
               <div className="flex items-center gap-1.5 px-2">
                 <User className="h-3.5 w-3.5" strokeWidth={1.5} />
-                Anonymous Student
+                Anonymous {reporter === "faculty" ? "Faculty" : "Student"}
               </div>
               <div className="flex items-center gap-1.5 px-2">
                 <Clock className="h-3.5 w-3.5" strokeWidth={1.5} />
-                Feb 12, 2026
+                {issue?.date ?? "—"}
               </div>
             </div>
           </div>
@@ -167,10 +157,13 @@ export default function IssueDetailPage() {
                   "flex items-center justify-center gap-2 rounded-xl border px-6 py-3 text-sm font-bold transition-all duration-300 shadow-sm min-w-[140px]",
                   upvoted
                     ? "border-primary bg-primary text-primary-foreground shadow-[0_0_20px_rgba(0,245,212,0.4)]"
-                    : "border-border hover:border-primary/50 text-muted-foreground hover:text-foreground bg-card"
+                    : "border-border hover:border-primary/50 text-muted-foreground hover:text-foreground bg-card",
                 )}
               >
-                <ThumbsUp className={cn("h-4 w-4", upvoted && "fill-current")} strokeWidth={2} />
+                <ThumbsUp
+                  className={cn("h-4 w-4", upvoted && "fill-current")}
+                  strokeWidth={2}
+                />
                 Upvote {upvoteCount}
               </motion.button>
             )}
@@ -179,12 +172,11 @@ export default function IssueDetailPage() {
 
         {/* Description */}
         <div className="mt-8 pt-8 border-t border-border/50">
-          <h3 className="text-sm font-semibold mb-3 text-foreground/80">Description</h3>
+          <h3 className="text-sm font-semibold mb-3 text-foreground/80">
+            Description
+          </h3>
           <div className="bg-muted/30 p-5 rounded-2xl border border-border/50 text-sm text-foreground/80 leading-7">
-            The air conditioning system in Block A Library has been non-functional for the past 3 days.
-            The temperature inside is uncomfortable, especially during afternoon hours, making it difficult
-            for students to study. Multiple students have reported this issue verbally to the library staff
-            but no action has been taken. The situation is particularly concerning given the current weather conditions.
+            {issue?.description ?? "No description available."}
           </div>
         </div>
       </motion.div>
@@ -204,10 +196,12 @@ export default function IssueDetailPage() {
             </div>
             <div>
               <h2 className="text-base font-bold">Status Timeline</h2>
-              <p className="text-xs text-muted-foreground">Tracking issue progress</p>
+              <p className="text-xs text-muted-foreground">
+                Tracking issue progress
+              </p>
             </div>
           </div>
-          <Timeline steps={timelineSteps} />
+          <Timeline steps={issueTimeline} />
         </motion.div>
 
         {/* Admin Updates */}
@@ -224,13 +218,17 @@ export default function IssueDetailPage() {
               </div>
               <div>
                 <h2 className="text-base font-bold">Official Updates</h2>
-                <p className="text-xs text-muted-foreground">Admin & Maintenance Log</p>
+                <p className="text-xs text-muted-foreground">
+                  Admin & Maintenance Log
+                </p>
               </div>
             </div>
-            <span className="text-[10px] font-mono bg-muted px-2 py-1 rounded border border-border/50">{adminUpdates.length} ENTRIES</span>
+            <span className="text-[10px] font-mono bg-muted px-2 py-1 rounded border border-border/50">
+              {issueAdminUpdates.length} ENTRIES
+            </span>
           </div>
 
-          <AdminChat updates={adminUpdates} />
+          <AdminChat updates={issueAdminUpdates} />
 
           <div className="mt-6 pt-6 border-t border-border/50">
             {role === "admin" ? (
@@ -254,14 +252,16 @@ export default function IssueDetailPage() {
                 </button>
               </div>
             ) : (
-              <p className="text-xs text-center text-muted-foreground/50">Only administrators can post updates to this log.</p>
+              <p className="text-xs text-center text-muted-foreground/50">
+                Only administrators can post updates to this log.
+              </p>
             )}
           </div>
         </motion.div>
       </div>
 
       {/* Bottom Actions */}
-        <motion.div
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
@@ -314,7 +314,9 @@ export default function IssueDetailPage() {
                 <h2 className="text-xl font-bold">Report False Issue</h2>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                Please provide a detailed reason why this issue is being reported as false. This request will be forwarded to the admin for review.
+                Please provide a detailed reason why this issue is being
+                reported as false. This request will be forwarded to the admin
+                for review.
               </p>
               <textarea
                 className="w-full h-32 rounded-xl border border-border bg-muted/30 p-4 text-sm focus:outline-none focus:ring-2 focus:ring-destructive/20 mb-4 resize-none"
@@ -364,12 +366,15 @@ export default function IssueDetailPage() {
                 <h2 className="text-xl font-bold">Mark as Resolved</h2>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                To close this issue, please provide evidence of resolution (e.g., description of work done, photos).
+                To close this issue, please provide evidence of resolution
+                (e.g., description of work done, photos).
               </p>
 
               <div className="space-y-4 mb-6">
                 <div>
-                  <label className="block text-xs font-medium mb-1.5 ml-1">Resolution Details</label>
+                  <label className="block text-xs font-medium mb-1.5 ml-1">
+                    Resolution Details
+                  </label>
                   <textarea
                     className="w-full h-24 rounded-xl border border-border bg-muted/30 p-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--success)]/20 resize-none"
                     placeholder="Describe the fix..."
@@ -378,7 +383,9 @@ export default function IssueDetailPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1.5 ml-1">Attach Evidence</label>
+                  <label className="block text-xs font-medium mb-1.5 ml-1">
+                    Attach Evidence
+                  </label>
                   <div className="h-24 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-muted-foreground bg-muted/10 hover:bg-muted/20 transition-colors cursor-pointer">
                     <span className="text-xs">Click to upload photo</span>
                   </div>

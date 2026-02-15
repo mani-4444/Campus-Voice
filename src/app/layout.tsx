@@ -3,8 +3,18 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppProvider } from "@/components/app-context";
-import { VisualEditsMessenger } from "orchids-visual-edits";
 import { Toaster } from "@/components/ui/sonner";
+
+// orchids-visual-edits is optional — only loaded if installed in dev
+let VisualEditsMessenger: React.ComponentType = () => null;
+if (process.env.NODE_ENV === "development") {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    VisualEditsMessenger = require("orchids-visual-edits").VisualEditsMessenger;
+  } catch {
+    // Package not installed — skip silently
+  }
+}
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -13,7 +23,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "CampusVoice - Smart Feedback Platform",
-  description: "AI-powered anonymous feedback and issue resolution for educational institutions",
+  description:
+    "AI-powered anonymous feedback and issue resolution for educational institutions",
 };
 
 export default function RootLayout({
@@ -29,8 +40,8 @@ export default function RootLayout({
             {children}
             <Toaster />
           </AppProvider>
+          <VisualEditsMessenger />
         </ThemeProvider>
-        <VisualEditsMessenger />
       </body>
     </html>
   );

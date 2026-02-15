@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
+import { categories, reportLocations } from "@/lib/mock/locations";
 
 interface StepCategoryLocationProps {
   category: string;
@@ -11,14 +12,12 @@ interface StepCategoryLocationProps {
   setLocation: (value: string) => void;
 }
 
-const categories = ["Infrastructure", "IT Services", "Academics", "Facilities", "Safety", "Administration", "Hostel", "Transportation"];
-const locations = [
-  "K Block", "M Block", "N Block", "L Block", "R&D Block",
-  "C Block", "D Block", "AIDS Block", "E Block",
-  "Sports Block", "Library", "Main Campus", "Hostel 1", "Hostel 2"
-];
-
-export function StepCategoryLocation({ category, setCategory, location, setLocation }: StepCategoryLocationProps) {
+export function StepCategoryLocation({
+  category,
+  setCategory,
+  location,
+  setLocation,
+}: StepCategoryLocationProps) {
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -41,7 +40,7 @@ export function StepCategoryLocation({ category, setCategory, location, setLocat
                 "relative rounded-xl border px-4 py-3 text-sm text-left transition-all duration-200 font-medium overflow-hidden group",
                 category === cat
                   ? "border-primary bg-primary/5 text-primary shadow-sm"
-                  : "border-border hover:border-primary/30 hover:bg-muted/50 text-foreground"
+                  : "border-border hover:border-primary/30 hover:bg-muted/50 text-foreground",
               )}
             >
               <span className="relative z-10">{cat}</span>
@@ -65,7 +64,7 @@ export function StepCategoryLocation({ category, setCategory, location, setLocat
       <div>
         <label className="block text-sm font-semibold mb-3">Location</label>
         <div className="grid grid-cols-2 gap-2">
-          {locations.map((loc, i) => (
+          {reportLocations.map((loc, i) => (
             <motion.button
               key={loc}
               initial={{ opacity: 0, y: 10 }}
@@ -76,7 +75,7 @@ export function StepCategoryLocation({ category, setCategory, location, setLocat
                 "relative rounded-xl border px-4 py-3 text-sm text-left transition-all duration-200 font-medium overflow-hidden group",
                 location === loc
                   ? "border-primary bg-primary/5 text-primary shadow-sm"
-                  : "border-border hover:border-primary/30 hover:bg-muted/50 text-foreground"
+                  : "border-border hover:border-primary/30 hover:bg-muted/50 text-foreground",
               )}
             >
               <span className="relative z-10">{loc}</span>

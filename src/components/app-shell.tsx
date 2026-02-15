@@ -4,7 +4,6 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { AppNavbar } from "@/components/app-navbar";
 import { useApp } from "@/components/app-context";
 import { cn } from "@/lib/utils";
-import { Toaster } from "sonner";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { sidebarCollapsed } = useApp();
@@ -16,17 +15,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main
         className={cn(
           "pt-16 min-h-screen transition-all duration-300",
-          sidebarCollapsed ? "pl-[68px]" : "pl-[240px]"
+          sidebarCollapsed ? "pl-[68px]" : "pl-[240px]",
         )}
       >
         <div className="p-6">{children}</div>
       </main>
-      <Toaster
-        position="bottom-right"
-        toastOptions={{
-          className: "!bg-card !text-card-foreground !border-border",
-        }}
-      />
     </div>
   );
 }
