@@ -62,7 +62,7 @@ export default function LoginPage() {
       {mounted && (
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="absolute top-6 right-6 z-10 rounded-xl p-2.5 text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-all duration-200 backdrop-blur-sm"
+          className="absolute top-6 right-6 z-10 rounded-xl p-2.5 text-muted-foreground dark:text-foreground/70 hover:bg-muted/50 hover:text-foreground transition-all duration-200 backdrop-blur-sm"
         >
           {theme === "dark" ? (
             <Sun className="h-5 w-5" strokeWidth={1.5} />
@@ -86,7 +86,7 @@ export default function LoginPage() {
               </div>
             </div>
             <h1 className="text-xl font-bold tracking-tight">CampusVoice</h1>
-            <p className="text-xs text-muted-foreground mt-1.5 tracking-wide uppercase">Smart Feedback Platform</p>
+            <p className="text-xs text-muted-foreground dark:text-foreground/70 mt-1.5 tracking-wide uppercase">Smart Feedback Platform</p>
           </div>
 
           {/* Role Tabs */}
@@ -102,7 +102,7 @@ export default function LoginPage() {
                   }`}
               >
                 <span className="text-sm font-medium block">{r.label}</span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">{r.desc}</span>
+                <span className="text-[10px] text-muted-foreground dark:text-foreground/70 block mt-0.5">{r.desc}</span>
               </button>
             ))}
           </div>
@@ -110,7 +110,7 @@ export default function LoginPage() {
           {/* Form */}
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-2">
+              <label className="block text-xs font-medium text-muted-foreground dark:text-foreground/70 mb-2">
                 {selectedRole === "student" ? "Roll Number" : "Email Address"}
               </label>
               <div className="relative">
@@ -130,7 +130,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-2">
+              <label className="block text-xs font-medium text-muted-foreground dark:text-foreground/70 mb-2">
                 Password
               </label>
               <div className="relative">
@@ -185,12 +185,12 @@ export default function LoginPage() {
           {/* Divider */}
           <div className="flex items-center gap-3 my-6">
             <div className="flex-1 h-px bg-border" />
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Secure & Anonymous</span>
+            <span className="text-[10px] text-muted-foreground dark:text-foreground/70 uppercase tracking-wider">Secure & Anonymous</span>
             <div className="flex-1 h-px bg-border" />
           </div>
 
           {/* Security badges */}
-          <div className="flex items-center justify-center gap-4 text-muted-foreground/60">
+          <div className="flex items-center justify-center gap-4 text-muted-foreground/60 dark:text-foreground/70">
             <div className="flex items-center gap-1.5">
               <Shield className="h-3 w-3" strokeWidth={1.5} />
               <span className="text-[10px]">End-to-End Encrypted</span>
@@ -204,7 +204,7 @@ export default function LoginPage() {
         </div>
 
         {/* Bottom text */}
-        <p className="text-center text-[11px] text-muted-foreground/60 mt-4">
+        <p className="text-center text-[11px] text-muted-foreground/60 dark:text-foreground/70 mt-4">
           All submissions are fully anonymous. Your identity is never revealed.
         </p>
       </div>

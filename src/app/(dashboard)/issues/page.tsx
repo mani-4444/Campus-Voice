@@ -33,7 +33,6 @@ export default function IssueListPage() {
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filterMyUpvoted, setFilterMyUpvoted] = useState(false);
-  const [filterResolved, setFilterResolved] = useState(false);
   const [filterEscalated, setFilterEscalated] = useState(false);
   const [filterReporter, setFilterReporter] = useState("All");
 
@@ -59,7 +58,6 @@ export default function IssueListPage() {
 
     // 3. Advanced toggles
     if (filterMyUpvoted && ![1, 4, 7].includes(issue.id)) return false; // Mocking "My Upvoted"
-    if (filterResolved && issue.status !== "Resolved") return false;
     // Mocking "Escalated" check - assuming high priority or specific keyword in title/status
     if (filterEscalated && issue.priority !== "Critical" && issue.priority !== "High") return false;
     if (filterReporter !== "All" && issue.reporter !== filterReporter.toLowerCase()) return false;
@@ -203,15 +201,6 @@ export default function IssueListPage() {
             ⚠️ Escalated / Critical
           </button>
 
-          <button
-            onClick={() => setFilterResolved(!filterResolved)}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 border",
-              filterResolved ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20" : "bg-card text-muted-foreground border-border/50 hover:border-border"
-            )}
-          >
-            ✅ Resolved Only
-          </button>
         </div>
       </div>
 

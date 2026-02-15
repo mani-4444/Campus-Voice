@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   ThumbsUp,
@@ -36,7 +37,21 @@ const adminUpdates = [
   { author: "Ravi (Facilities)", message: "Parts ordered for AC unit replacement (Compressor Unit XJ-900). Vendor: CoolTech Systems. Will update when parts arrive.", time: "Feb 14, 2026 - 10:00 AM", type: "update" },
 ];
 
+const issues = [
+  { id: 1, reporter: "student" },
+  { id: 2, reporter: "student" },
+  { id: 3, reporter: "faculty" },
+  { id: 4, reporter: "student" },
+  { id: 5, reporter: "faculty" },
+  { id: 6, reporter: "student" },
+  { id: 7, reporter: "student" },
+  { id: 8, reporter: "faculty" },
+];
+
 export default function IssueDetailPage() {
+  const params = useParams<{ id: string }>();
+  const issueId = Number(params.id);
+  const issueReporter = issues.find((issue) => issue.id === issueId)?.reporter ?? "student";
   const [upvoted, setUpvoted] = useState(false);
   const [upvoteCount, setUpvoteCount] = useState(47);
 
@@ -50,7 +65,15 @@ export default function IssueDetailPage() {
   const [adminUpdateText, setAdminUpdateText] = useState("");
 
   // Mock reporter type for this issue. In a real app this comes from the issue data.
-  const reporter = "student"; // or "faculty"
+  const reporter = issueReporter; // "student" | "faculty"
+  const issueReporterId = reporter === "faculty" ? "faculty-001" : "student-001";
+  const currentUserId = role === "faculty" ? "faculty-001" : "student-001";
+  const isIssueOwner = role === reporter && currentUserId === issueReporterId;
+  const canUpvote = role !== "admin" && !(role === "faculty" && reporter === "student");
+  const canResolve =
+    role === "admin" ||
+    (reporter === "student" && role === "student") ||
+    (reporter === "faculty" && role === "faculty" && isIssueOwner);
 
   useEffect(() => {
     const savedRole = localStorage.getItem("app-role");
@@ -135,7 +158,7 @@ export default function IssueDetailPage() {
           </div>
 
           <div className="shrink-0 flex flex-row md:flex-col gap-3">
-            {role !== "admin" && (
+            {canUpvote && (
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -253,13 +276,15 @@ export default function IssueDetailPage() {
             Report False Issue
           </button>
         )}
-        <button
-          onClick={() => setShowResolve(true)}
-          className="flex items-center gap-2 rounded-xl bg-foreground text-background px-6 py-2.5 text-sm font-bold hover:opacity-90 transition-all duration-200 shadow-lg"
-        >
-          <CheckCircle className="h-4 w-4" strokeWidth={2} />
-          Mark as Resolved
-        </button>
+        {canResolve && (
+          <button
+            onClick={() => setShowResolve(true)}
+            className="flex items-center gap-2 rounded-xl bg-foreground text-background px-6 py-2.5 text-sm font-bold hover:opacity-90 transition-all duration-200 shadow-lg"
+          >
+            <CheckCircle className="h-4 w-4" strokeWidth={2} />
+            Mark as Resolved
+          </button>
+        )}
         {role === "faculty" && reporter === "student" && (
           <button
             onClick={() => toast.success("Issue escalated to Administration")}
