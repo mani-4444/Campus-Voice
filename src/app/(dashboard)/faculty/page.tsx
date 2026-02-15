@@ -56,7 +56,7 @@ export default function FacultyDashboard() {
             Last updated: Just now
           </span>
           <Link href="/report" className="flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 py-2.5 text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0">
-            Generate Report
+            Report New Issue
           </Link>
         </div>
       </motion.div>

@@ -11,6 +11,7 @@ export function AppNavbar() {
   const { role, sidebarCollapsed } = useApp();
   const [mounted, setMounted] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -63,19 +64,36 @@ export function AppNavbar() {
           </button>
         )}
 
-        {/* Profile */}
-        <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors duration-200">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-            <User className="h-3.5 w-3.5 text-primary" strokeWidth={1.5} />
+          {/* Profile dropdown (moved here from sidebar) */}
+          <div className="relative">
+            <button
+              onClick={() => setShowProfileMenu((s) => !s)}
+              className="flex items-center gap-2 rounded-xl border border-border px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors duration-200"
+            >
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+                <User className="h-3.5 w-3.5 text-primary" strokeWidth={1.5} />
+              </div>
+              <div className="hidden sm:block">
+                <p className="text-xs font-medium leading-none">{roleLabel}</p>
+              </div>
+              <ChevronDown className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />
+            </button>
+
+            {showProfileMenu && (
+              <div className="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card p-2 shadow-lg z-50">
+                <a href="/profile" className="block px-3 py-2 text-sm text-foreground hover:bg-muted rounded-md">View Profile</a>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("app-role");
+                    window.location.href = "/";
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-md"
+                >
+                  Log Out
+                </button>
+              </div>
+            )}
           </div>
-          <div className="hidden sm:block">
-            <p className="text-xs font-medium leading-none">{roleLabel}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              {role === "student" ? "Anonymous Student" : role === "faculty" ? "Dr. Faculty" : "Administrator"}
-            </p>
-          </div>
-          <ChevronDown className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />
-        </div>
       </div>
     </header>
   );

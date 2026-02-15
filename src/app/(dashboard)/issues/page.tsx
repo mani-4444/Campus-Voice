@@ -14,14 +14,14 @@ import { IssueCard } from "@/components/issue-card";
 import { IssueListItem } from "@/components/issue-list-item";
 
 const issues = [
-  { id: 1, title: "Library AC not functioning in Block A", status: "In Progress", priority: "High", upvotes: 47, category: "Infrastructure", location: "Block A", date: "Feb 12, 2026", progress: 60 },
-  { id: 2, title: "WiFi connectivity drops in Hostel 3", status: "Submitted", priority: "Critical", upvotes: 38, category: "IT Services", location: "Hostel 3", date: "Feb 11, 2026", progress: 10 },
-  { id: 3, title: "Lab equipment outdated in CS Department", status: "Under Review", priority: "Medium", upvotes: 31, category: "Academics", location: "Block B", date: "Feb 10, 2026", progress: 30 },
-  { id: 4, title: "Cafeteria hygiene concerns reported", status: "In Progress", priority: "High", upvotes: 28, category: "Facilities", location: "Cafeteria", date: "Feb 9, 2026", progress: 45 },
-  { id: 5, title: "Parking lot lighting insufficient", status: "Submitted", priority: "Low", upvotes: 19, category: "Safety", location: "Main Campus", date: "Feb 8, 2026", progress: 5 },
-  { id: 6, title: "Hostel water supply irregular schedule", status: "Resolved", priority: "High", upvotes: 52, category: "Hostel", location: "Hostel 1", date: "Feb 5, 2026", progress: 100 },
-  { id: 7, title: "Bus timing inconsistency for Route 3", status: "In Progress", priority: "Medium", upvotes: 23, category: "Transportation", location: "Main Campus", date: "Feb 4, 2026", progress: 55 },
-  { id: 8, title: "Exam hall seating arrangement complaint", status: "Resolved", priority: "Low", upvotes: 15, category: "Administration", location: "Block C", date: "Feb 3, 2026", progress: 100 },
+  { id: 1, title: "Library AC not functioning in Block A", status: "In Progress", priority: "High", upvotes: 47, category: "Infrastructure", location: "Block A", date: "Feb 12, 2026", progress: 60, reporter: "student" },
+  { id: 2, title: "WiFi connectivity drops in Hostel 3", status: "Submitted", priority: "Critical", upvotes: 38, category: "IT Services", location: "Hostel 3", date: "Feb 11, 2026", progress: 10, reporter: "student" },
+  { id: 3, title: "Lab equipment outdated in CS Department", status: "Under Review", priority: "Medium", upvotes: 31, category: "Academics", location: "Block B", date: "Feb 10, 2026", progress: 30, reporter: "faculty" },
+  { id: 4, title: "Cafeteria hygiene concerns reported", status: "In Progress", priority: "High", upvotes: 28, category: "Facilities", location: "Cafeteria", date: "Feb 9, 2026", progress: 45, reporter: "student" },
+  { id: 5, title: "Parking lot lighting insufficient", status: "Submitted", priority: "Low", upvotes: 19, category: "Safety", location: "Main Campus", date: "Feb 8, 2026", progress: 5, reporter: "faculty" },
+  { id: 6, title: "Hostel water supply irregular schedule", status: "Resolved", priority: "High", upvotes: 52, category: "Hostel", location: "Hostel 1", date: "Feb 5, 2026", progress: 100, reporter: "student" },
+  { id: 7, title: "Bus timing inconsistency for Route 3", status: "In Progress", priority: "Medium", upvotes: 23, category: "Transportation", location: "Main Campus", date: "Feb 4, 2026", progress: 55, reporter: "student" },
+  { id: 8, title: "Exam hall seating arrangement complaint", status: "Resolved", priority: "Low", upvotes: 15, category: "Administration", location: "Block C", date: "Feb 3, 2026", progress: 100, reporter: "faculty" },
 ];
 
 const filterCategories = ["All", "Infrastructure", "IT Services", "Academics", "Facilities", "Safety", "Hostel", "Transportation", "Administration"];
@@ -35,6 +35,7 @@ export default function IssueListPage() {
   const [filterMyUpvoted, setFilterMyUpvoted] = useState(false);
   const [filterResolved, setFilterResolved] = useState(false);
   const [filterEscalated, setFilterEscalated] = useState(false);
+  const [filterReporter, setFilterReporter] = useState("All");
 
   // In a real app, we'd use the hook. For now, mocking based on localStorage or default.
   // We need to access role to filter out Hostel/Transport for faculty.
@@ -61,6 +62,7 @@ export default function IssueListPage() {
     if (filterResolved && issue.status !== "Resolved") return false;
     // Mocking "Escalated" check - assuming high priority or specific keyword in title/status
     if (filterEscalated && issue.priority !== "Critical" && issue.priority !== "High") return false;
+    if (filterReporter !== "All" && issue.reporter !== filterReporter.toLowerCase()) return false;
 
     return true;
   });
@@ -152,6 +154,29 @@ export default function IssueListPage() {
             </button>
           ))}
         </div>
+
+        {/* Reporter filter for faculty: Student vs Faculty issues */}
+        {role === "faculty" && (
+          <div className="flex flex-wrap gap-2 items-center pt-2">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold mr-2">Reporter:</span>
+            {[
+              { key: "All", label: "All" },
+              { key: "student", label: "Student" },
+              { key: "faculty", label: "Faculty" },
+            ].map((r) => (
+              <button
+                key={r.key}
+                onClick={() => setFilterReporter(r.key === "All" ? "All" : r.key)}
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 border",
+                  filterReporter === (r.key === "All" ? "All" : r.key) ? "bg-primary/10 text-primary border-primary/20" : "bg-card text-muted-foreground border-border/50 hover:border-border hover:text-foreground"
+                )}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Advanced Filters */}
         <div className="flex flex-wrap gap-3 items-center pt-2 border-t border-border/50">

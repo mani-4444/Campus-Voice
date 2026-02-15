@@ -102,7 +102,7 @@ export default function LoginPage() {
                   }`}
               >
                 <span className="text-sm font-medium block">{r.label}</span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">{r.desc}</span>
+                  <span className="text-[10px] text-foreground/80 block mt-0.5">{r.desc}</span>
               </button>
             ))}
           </div>
@@ -110,7 +110,7 @@ export default function LoginPage() {
           {/* Form */}
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-2">
+              <label className="block text-xs font-medium text-foreground/80 mb-2">
                 {selectedRole === "student" ? "Roll Number" : "Email Address"}
               </label>
               <div className="relative">
@@ -130,7 +130,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-2">
+              <label className="block text-xs font-medium text-foreground/80 mb-2">
                 Password
               </label>
               <div className="relative">
@@ -190,7 +190,7 @@ export default function LoginPage() {
           </div>
 
           {/* Security badges */}
-          <div className="flex items-center justify-center gap-4 text-muted-foreground/60">
+          <div className="flex items-center justify-center gap-4 text-foreground/70">
             <div className="flex items-center gap-1.5">
               <Shield className="h-3 w-3" strokeWidth={1.5} />
               <span className="text-[10px]">End-to-End Encrypted</span>
@@ -204,7 +204,7 @@ export default function LoginPage() {
         </div>
 
         {/* Bottom text */}
-        <p className="text-center text-[11px] text-muted-foreground/60 mt-4">
+        <p className="text-center text-[11px] text-foreground/70 mt-4">
           All submissions are fully anonymous. Your identity is never revealed.
         </p>
       </div>

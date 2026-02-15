@@ -97,30 +97,7 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Role badge */}
-      {!sidebarCollapsed && (
-        <div className="px-3 pb-3">
-          <div className="rounded-xl bg-muted/30 border border-border/50 p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Current Role</p>
-            <p className="text-xs font-semibold mt-0.5 capitalize">{role}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Logout */}
-      <div className="mt-auto border-t border-border p-3">
-        <button
-          onClick={() => {
-            // In a real app, this would sign out via auth provider.
-            // Here we just clear the role/session simulation.
-            window.location.href = "/";
-          }}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors duration-200"
-        >
-          <ChevronLeft className={cn("h-[18px] w-[18px] rotate-180", sidebarCollapsed && "mx-auto")} />
-          {!sidebarCollapsed && <span>Log Out</span>}
-        </button>
-      </div>
+      {/* Left-side role badge and logout removed — moved into top-right profile menu */}
 
       {/* Collapse Toggle */}
       <div className="border-t border-border p-3">

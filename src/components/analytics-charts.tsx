@@ -42,7 +42,7 @@ export function AnalyticsCharts({ departmentData, sentimentData }: AnalyticsChar
                     </div>
                     <div>
                         <h2 className="text-base font-bold">Issues by Department</h2>
-                        <p className="text-xs text-muted-foreground">Distribution across campus</p>
+                        <p className="text-xs text-foreground/80">Distribution across campus</p>
                     </div>
                 </div>
                 <div className="h-[250px] w-full">
@@ -92,7 +92,7 @@ export function AnalyticsCharts({ departmentData, sentimentData }: AnalyticsChar
                     </div>
                     <div>
                         <h2 className="text-base font-bold">Sentiment</h2>
-                        <p className="text-xs text-muted-foreground">Student feedback tone</p>
+                        <p className="text-xs text-foreground/80">Student feedback tone</p>
                     </div>
                 </div>
 
@@ -138,7 +138,7 @@ export function AnalyticsCharts({ departmentData, sentimentData }: AnalyticsChar
                     {sentimentData.map((s) => (
                         <div key={s.name} className="flex flex-col items-center">
                             <div className="h-1.5 w-8 rounded-full mb-1.5" style={{ backgroundColor: s.color }} />
-                            <span className="text-[10px] text-muted-foreground font-medium">{s.name}</span>
+                            <span className="text-[10px] text-foreground/80 font-medium">{s.name}</span>
                         </div>
                     ))}
                 </div>
@@ -149,7 +149,7 @@ export function AnalyticsCharts({ departmentData, sentimentData }: AnalyticsChar
                 <div className="flex items-center justify-between mb-6">
                     <div>
                         <h3 className="text-base font-bold">Subject Feedback</h3>
-                        <p className="text-xs text-muted-foreground">Student Ratings (Avg)</p>
+                        <p className="text-xs text-foreground/80">Student Ratings (Avg)</p>
                     </div>
                     <TrendingUp className="h-5 w-5 text-muted-foreground" />
                 </div>
