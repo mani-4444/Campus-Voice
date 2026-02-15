@@ -49,6 +49,9 @@ export default function IssueDetailPage() {
   const [role, setRole] = useState("student");
   const [adminUpdateText, setAdminUpdateText] = useState("");
 
+  // Mock reporter type for this issue. In a real app this comes from the issue data.
+  const reporter = "student"; // or "faculty"
+
   useEffect(() => {
     const savedRole = localStorage.getItem("app-role");
     if (savedRole) setRole(savedRole);
@@ -132,20 +135,22 @@ export default function IssueDetailPage() {
           </div>
 
           <div className="shrink-0 flex flex-row md:flex-col gap-3">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleUpvote}
-              className={cn(
-                "flex items-center justify-center gap-2 rounded-xl border px-6 py-3 text-sm font-bold transition-all duration-300 shadow-sm min-w-[140px]",
-                upvoted
-                  ? "border-primary bg-primary text-primary-foreground shadow-[0_0_20px_rgba(0,245,212,0.4)]"
-                  : "border-border hover:border-primary/50 text-muted-foreground hover:text-foreground bg-card"
-              )}
-            >
-              <ThumbsUp className={cn("h-4 w-4", upvoted && "fill-current")} strokeWidth={2} />
-              Upvote {upvoteCount}
-            </motion.button>
+            {role !== "admin" && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleUpvote}
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-xl border px-6 py-3 text-sm font-bold transition-all duration-300 shadow-sm min-w-[140px]",
+                  upvoted
+                    ? "border-primary bg-primary text-primary-foreground shadow-[0_0_20px_rgba(0,245,212,0.4)]"
+                    : "border-border hover:border-primary/50 text-muted-foreground hover:text-foreground bg-card"
+                )}
+              >
+                <ThumbsUp className={cn("h-4 w-4", upvoted && "fill-current")} strokeWidth={2} />
+                Upvote {upvoteCount}
+              </motion.button>
+            )}
           </div>
         </div>
 
@@ -233,19 +238,21 @@ export default function IssueDetailPage() {
       </div>
 
       {/* Bottom Actions */}
-      <motion.div
+        <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
         className="flex items-center justify-end gap-4 border-t border-border pt-8"
       >
-        <button
-          onClick={() => setShowReportFalse(true)}
-          className="flex items-center gap-2 rounded-xl border border-destructive/20 px-5 py-2.5 text-sm font-bold text-destructive hover:bg-destructive/5 transition-all duration-200"
-        >
-          <Flag className="h-4 w-4" strokeWidth={2} />
-          Report False Issue
-        </button>
+        {role !== "admin" && (
+          <button
+            onClick={() => setShowReportFalse(true)}
+            className="flex items-center gap-2 rounded-xl border border-destructive/20 px-5 py-2.5 text-sm font-bold text-destructive hover:bg-destructive/5 transition-all duration-200"
+          >
+            <Flag className="h-4 w-4" strokeWidth={2} />
+            Report False Issue
+          </button>
+        )}
         <button
           onClick={() => setShowResolve(true)}
           className="flex items-center gap-2 rounded-xl bg-foreground text-background px-6 py-2.5 text-sm font-bold hover:opacity-90 transition-all duration-200 shadow-lg"
@@ -253,7 +260,7 @@ export default function IssueDetailPage() {
           <CheckCircle className="h-4 w-4" strokeWidth={2} />
           Mark as Resolved
         </button>
-        {role === "faculty" && (
+        {role === "faculty" && reporter === "student" && (
           <button
             onClick={() => toast.success("Issue escalated to Administration")}
             className="flex items-center gap-2 rounded-xl border border-[var(--warning)]/50 bg-[var(--warning)]/10 text-[var(--warning)] px-4 py-2.5 text-sm font-bold hover:bg-[var(--warning)]/20 transition-all duration-200"
