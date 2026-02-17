@@ -11,7 +11,6 @@ import {
   Moon,
   ArrowRight,
   Lock,
-  Mail,
   UserPlus,
   LogIn,
   Users,
@@ -39,35 +38,23 @@ export default function LoginPage() {
 
   useEffect(() => {
     setMounted(true);
-    
-    // Check Supabase connectivity
-    const checkSupabase = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        console.log("[Supabase] Connected, session:", data?.session ? "exists" : "none");
-      } catch (err) {
-        console.error("[Supabase] Connection error:", err);
-        toast.error("Cannot connect to Supabase. Check your internet connection.");
-      }
-    };
-    
-    checkSupabase();
   }, []);
 
   const redirectByRole = (userRole: UserRole) => {
-    // Save role to localStorage for app context
-    if (typeof window !== "undefined") {
-      localStorage.setItem("app-role", userRole);
-      console.log("[Auth] Saved role to localStorage:", userRole);
-    }
-    
-    const path = 
-      userRole === "student" ? "/dashboard" :
-      userRole === "faculty" ? "/faculty" :
-      "/admin";
-    
+    // Save role to localStorage so AppProvider picks it up instantly
+    localStorage.setItem("app-role", userRole);
+    console.log("[Auth] Saved role to localStorage:", userRole);
+
+    const path =
+      userRole === "student"
+        ? "/dashboard"
+        : userRole === "faculty"
+          ? "/faculty"
+          : "/admin";
+
     console.log("[Auth] Redirecting to:", path);
-    router.push(path);
+    // Full page navigation so the middleware sees fresh cookies
+    window.location.href = path;
   };
 
   const handleAuth = async () => {
@@ -91,71 +78,73 @@ export default function LoginPage() {
     console.log("[Auth] Starting auth process for role:", role);
 
     try {
+      // ── Resolve email ──
+      // Students: accept bare roll number OR full email
+      // Faculty/Admin: use the email exactly as typed
+      let email: string;
+      if (role === "student") {
+        email = identifier.includes("@")
+          ? identifier.trim()
+          : `${identifier.trim()}@student.campusvoice.local`;
+      } else {
+        email = identifier.trim();
+      }
+      console.log(
+        "[Auth] Resolved email:",
+        email,
+        "| role:",
+        role,
+        "| mode:",
+        isSignUp ? "signup" : "signin",
+      );
+
       if (isSignUp) {
         // ── Sign Up ──
-        const email =
-          role === "student"
-            ? `${identifier}@campus.edu`
-            : `${identifier}@campusvoice.local`;
         console.log("[Auth] Signing up with:", email);
-        
+
         const { error } = await supabase.auth.signUp({
           email,
           password,
           data: { role, identifier },
         });
-        
+
         if (error) {
           console.error("[Auth] Signup error:", error.message);
           toast.error(error.message);
           setLoading(false);
           return;
         }
-        
+
         console.log("[Auth] Signup successful, redirecting...");
         toast.success("Account created! Redirecting...");
-        
+
         // Redirect with a small delay to ensure auth state updates
         setTimeout(() => redirectByRole(role), 500);
       } else {
         // ── Sign In ──
-        // All roles need emails in format: identifier@domain
-        const email =
-          role === "student"
-            ? `${identifier}@campus.edu`
-            : `${identifier}@campusvoice.local`;
         console.log("[Auth] Signing in with:", email);
-        
-        try {
-          const { error, data } = await Promise.race([
-            supabase.auth.signInWithPassword({ email, password }),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error("Sign in request timed out after 10 seconds")), 10000)
-            )
-          ]) as any;
-          
-          if (error) {
-            console.error("[Auth] Signin error:", error.message);
-            toast.error(error.message || "Sign in failed");
-            setLoading(false);
-            return;
-          }
-          
-          console.log("[Auth] Signin successful, user:", data?.user?.email);
-          toast.success("Signed in! Redirecting...");
-          
-          // Redirect with a small delay to ensure auth state updates
-          setTimeout(() => redirectByRole(role), 500);
-        } catch (signInError) {
-          const errorMsg = signInError instanceof Error ? signInError.message : "Sign in failed";
-          console.error("[Auth] Signin exception:", errorMsg);
-          toast.error(errorMsg);
+
+        const { error, data } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          console.error("[Auth] Signin error:", error.message);
+          toast.error(error.message || "Sign in failed");
           setLoading(false);
           return;
         }
+
+        console.log("[Auth] Signin successful, user:", data?.user?.email);
+        toast.success("Signed in! Redirecting...");
+
+        // Redirect with a small delay to ensure auth state updates
+        setTimeout(() => redirectByRole(role), 500);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+      const message =
+        err instanceof Error ? err.message : "An unexpected error occurred.";
       console.error("[Auth] Exception:", err);
       toast.error(message);
       setLoading(false);
@@ -341,8 +330,10 @@ export default function LoginPage() {
                       onChange={(e) => setIdentifier(e.target.value)}
                       placeholder={
                         role === "student"
-                          ? "e.g., 2024001"
-                          : "you@example.com"
+                          ? "e.g., student1 or student1@student.campusvoice.local"
+                          : role === "faculty"
+                            ? "e.g., faculty1@campusvoice.local"
+                            : "e.g., admin1@campusvoice.local"
                       }
                       onFocus={() => setInputFocus("identifier")}
                       onBlur={() => setInputFocus(null)}

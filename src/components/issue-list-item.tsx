@@ -36,7 +36,7 @@ export function IssueListItem({ issue, index }: IssueListItemProps) {
           </p>
           <div className="flex items-center gap-2 mt-1.5 align-middle">
             <span className="text-[10px] font-mono text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
-              #{String(issue.id).padStart(3, "0")}
+              #{issue.id.slice(0, 8)}
             </span>
             <span className="text-muted-foreground/30">·</span>
             <span className="text-[10px] text-muted-foreground font-medium">
@@ -70,7 +70,7 @@ export function IssueListItem({ issue, index }: IssueListItemProps) {
         </div>
 
         <span className="text-[11px] text-muted-foreground/60 shrink-0 hidden sm:block w-20 text-right">
-          {issue.created_at.split('T')[0]}
+          {issue.created_at.split("T")[0]}
         </span>
       </Link>
     </motion.div>

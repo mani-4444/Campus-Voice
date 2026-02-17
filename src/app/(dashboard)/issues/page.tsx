@@ -64,12 +64,16 @@ export default function IssueListPage() {
     // 2. Standard filters
     if (activeCategory !== "All" && issue.category !== activeCategory)
       return false;
-    if (activeStatus !== "All" && issue.status.replace("_", " ") !== activeStatus) return false;
+    if (
+      activeStatus !== "All" &&
+      issue.status.replace("_", " ") !== activeStatus
+    )
+      return false;
     if (search && !issue.title.toLowerCase().includes(search.toLowerCase()))
       return false;
 
     // 3. Advanced toggles
-    if (filterMyUpvoted && ![1, 4, 7].includes(issue.id)) return false; // Mocking "My Upvoted"
+    if (filterMyUpvoted) return false; // TODO: Check user's votes from DB
     // Mocking "Escalated" check - High > medium priority
     if (
       filterEscalated &&
@@ -131,7 +135,9 @@ export default function IssueListPage() {
         <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 flex items-start gap-4">
           <AlertCircle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
           <div>
-            <h3 className="font-semibold text-destructive mb-1">Failed to load issues</h3>
+            <h3 className="font-semibold text-destructive mb-1">
+              Failed to load issues
+            </h3>
             <p className="text-sm text-muted-foreground">{error}</p>
           </div>
         </div>

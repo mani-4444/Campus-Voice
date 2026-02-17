@@ -34,8 +34,8 @@ import type { DbIssue, DbIssueUpdate } from "@/types/db";
 
 export default function IssueDetailPage() {
   const params = useParams<{ id: string }>();
-  const issueId = Number(params.id);
-  const { role } = useApp();
+  const issueId = params.id;
+  const { role, user } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,16 +88,10 @@ export default function IssueDetailPage() {
     fetchIssueData();
   }, [issueId]);
 
-  const reporter = issue?.reporter_id ? "faculty" : "student";
-  const issueReporterId = issue?.reporter_id ?? "student-001";
-  const currentUserId = role === "faculty" ? "faculty-001" : "student-001";
-  const isIssueOwner = role === reporter && currentUserId === issueReporterId;
-  const canUpvote =
-    role !== "admin" && !(role === "faculty" && reporter === "student");
-  const canResolve =
-    role === "admin" ||
-    (reporter === "student" && role === "student") ||
-    (reporter === "faculty" && role === "faculty" && isIssueOwner);
+  const currentUserId = user?.id ?? "";
+  const isIssueOwner = issue?.created_by === currentUserId;
+  const canUpvote = role !== "admin";
+  const canResolve = role === "admin" || isIssueOwner;
 
   const handleUpvote = async () => {
     if (!issue || upvoting) return;
@@ -205,7 +199,7 @@ export default function IssueDetailPage() {
                 {issue?.priority ?? "—"} Priority
               </span>
               <span className="text-[10px] text-muted-foreground/60 font-mono bg-muted/50 px-2 py-1 rounded-md border border-border/50">
-                ID: #{String(issueId).padStart(3, "0")}
+                ID: #{issueId.slice(0, 8)}
               </span>
             </div>
 
@@ -231,11 +225,11 @@ export default function IssueDetailPage() {
               </div>
               <div className="flex items-center gap-1.5 px-2">
                 <User className="h-3.5 w-3.5" strokeWidth={1.5} />
-                Anonymous {reporter === "faculty" ? "Faculty" : "Student"}
+                Anonymous Reporter
               </div>
               <div className="flex items-center gap-1.5 px-2">
                 <Clock className="h-3.5 w-3.5" strokeWidth={1.5} />
-                {issue?.created_at.split('T')[0] ?? "—"}
+                {issue?.created_at.split("T")[0] ?? "—"}
               </div>
             </div>
           </div>
@@ -294,7 +288,15 @@ export default function IssueDetailPage() {
               </p>
             </div>
           </div>
-          <Timeline steps={timeline} />
+          <Timeline
+            steps={timeline.map((t, i) => ({
+              label: t.message,
+              date: new Date(t.created_at).toLocaleDateString(),
+              completed: i < timeline.length - 1,
+              current: i === timeline.length - 1,
+              description: t.created_by ?? "System",
+            }))}
+          />
         </motion.div>
 
         {/* Admin Updates */}
@@ -321,7 +323,14 @@ export default function IssueDetailPage() {
             </span>
           </div>
 
-          <AdminChat updates={adminUpdates} />
+          <AdminChat
+            updates={adminUpdates.map((u) => ({
+              author: u.created_by ?? "Admin",
+              message: u.message,
+              time: new Date(u.created_at).toLocaleString(),
+              type: u.update_type,
+            }))}
+          />
 
           <div className="mt-6 pt-6 border-t border-border/50">
             {role === "admin" ? (
@@ -378,7 +387,7 @@ export default function IssueDetailPage() {
             Mark as Resolved
           </button>
         )}
-        {role === "faculty" && reporter === "student" && (
+        {role === "faculty" && !isIssueOwner && (
           <button
             onClick={() => toast.success("Issue escalated to Administration")}
             className="flex items-center gap-2 rounded-xl border border-[var(--warning)]/50 bg-[var(--warning)]/10 text-[var(--warning)] px-4 py-2.5 text-sm font-bold hover:bg-[var(--warning)]/20 transition-all duration-200"

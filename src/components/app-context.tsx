@@ -41,70 +41,77 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [authLoading, setAuthLoading] = useState(true);
   const supabase = createClient();
 
-  // Fetch profile role from Supabase (with fallback to localStorage)
+  // Fetch profile role from Supabase (with 5 s timeout + localStorage fallback)
   const fetchProfile = useCallback(
     async (userId: string) => {
+      const fallback = () => {
+        const saved = localStorage.getItem("app-role") as UserRole;
+        if (saved && ["student", "faculty", "admin"].includes(saved)) {
+          setRoleState(saved);
+        }
+      };
+
       try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
+
         const { data: profile, error } = await supabase
           .from("profiles")
           .select("role")
           .eq("id", userId)
-          .single();
-        
+          .single()
+          .abortSignal(controller.signal);
+
+        clearTimeout(timer);
+
         if (error) {
-          console.warn("Profile fetch error (expected if DB not set up):", error.message);
-          // Use role from localStorage if available
-          const savedRole = localStorage.getItem("app-role") as UserRole;
-          if (savedRole && ["student", "faculty", "admin"].includes(savedRole)) {
-            setRoleState(savedRole);
-          }
+          console.warn("[AppProvider] Profile fetch error:", error.message);
+          fallback();
           return;
         }
-        
-        if (profile?.role && ["student", "faculty", "admin"].includes(profile.role)) {
+
+        if (
+          profile?.role &&
+          ["student", "faculty", "admin"].includes(profile.role)
+        ) {
+          console.log("[AppProvider] Profile role:", profile.role);
           setRoleState(profile.role as UserRole);
           localStorage.setItem("app-role", profile.role);
         }
       } catch (err) {
-        console.warn("Error fetching profile:", err);
-        // Fallback to localStorage
-        const savedRole = localStorage.getItem("app-role") as UserRole;
-        if (savedRole && ["student", "faculty", "admin"].includes(savedRole)) {
-          setRoleState(savedRole);
-        }
+        console.warn("[AppProvider] Profile fetch failed/timed-out:", err);
+        fallback();
       }
     },
     [supabase],
   );
 
+  // Immediately restore role from localStorage so UI renders without waiting
   useEffect(() => {
     setMounted(true);
 
-    // Check current session
+    // Sync localStorage role immediately (no network wait)
+    const savedRole = localStorage.getItem("app-role") as UserRole;
+    if (savedRole && ["student", "faculty", "admin"].includes(savedRole)) {
+      setRoleState(savedRole);
+    }
+
+    // Then check real auth in background
     const initAuth = async () => {
       try {
         const {
           data: { user: currentUser },
         } = await supabase.auth.getUser();
+        console.log(
+          "[AppProvider] getUser:",
+          currentUser ? currentUser.email : "none",
+        );
         setUser(currentUser);
         if (currentUser) {
           await fetchProfile(currentUser.id);
-        } else {
-          // Fallback to localStorage for unauthenticated browsing (landing page, etc.)
-          const savedRole = localStorage.getItem("app-role") as UserRole;
-          if (
-            savedRole &&
-            ["student", "faculty", "admin"].includes(savedRole)
-          ) {
-            setRoleState(savedRole);
-          }
         }
-      } catch {
-        // Supabase not configured or network error — fall back to localStorage
-        const savedRole = localStorage.getItem("app-role") as UserRole;
-        if (savedRole && ["student", "faculty", "admin"].includes(savedRole)) {
-          setRoleState(savedRole);
-        }
+      } catch (e) {
+        console.warn("[AppProvider] getUser failed:", e);
       } finally {
         setAuthLoading(false);
       }
@@ -112,16 +119,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     initAuth();
 
-    // Listen for auth state changes
+    // Listen for auth state changes (e.g. sign-in from another tab)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (_event: AuthChangeEvent, session: Session | null) => {
+      (_event: AuthChangeEvent, session: Session | null) => {
         const sessionUser = session?.user ?? null;
         setUser(sessionUser);
+        // Role was already set by initAuth or login page — don't re-fetch here
+        // to avoid unbounded network calls that can hang the UI.
         if (sessionUser) {
-          await fetchProfile(sessionUser.id);
+          const saved = localStorage.getItem("app-role") as UserRole;
+          if (saved && ["student", "faculty", "admin"].includes(saved)) {
+            setRoleState(saved);
+          }
         }
+        setAuthLoading(false);
       },
     );
 
@@ -142,18 +155,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error("Logout exception:", err);
     }
-    
+
     // Clear local state
     setUser(null);
     setRoleState("student");
     localStorage.removeItem("app-role");
-    
+
     // Redirect to login
     window.location.href = "/login";
   };
 
   if (!mounted) {
-    return null;
+    // Return children immediately on SSR — hydration will pick up
+    return <>{children}</>;
   }
 
   return (

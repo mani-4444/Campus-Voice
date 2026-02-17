@@ -6,6 +6,11 @@ import { type NextRequest, NextResponse } from "next/server";
  * Called from src/middleware.ts on every matched request.
  */
 export async function updateSession(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // ── Always create the Supabase server client so cookies are synced ──
+  // Even on public routes the client must run so that session cookies
+  // set during signIn are properly forwarded in the response.
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -29,20 +34,31 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // IMPORTANT: Do not use getSession() — it reads from storage only.
-  // getUser() makes a network call to verify the token.
+  // Public routes — still refresh session (cookie sync) but skip the
+  // expensive getUser() network call & never redirect.
+  const isPublicRoute =
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname.startsWith("/api/auth");
+
+  if (isPublicRoute) {
+    // Touch the session so cookies flow through
+    await supabase.auth.getSession();
+    console.log(`[Middleware] ${pathname} → public, skipping auth check`);
+    return supabaseResponse;
+  }
+
+  // ── Protected routes — verify user via network call ──
   let user = null;
   try {
     const { data } = await supabase.auth.getUser();
     user = data.user;
   } catch {
-    // Supabase unreachable or misconfigured — treat as unauthenticated
     user = null;
   }
 
-  const { pathname } = request.nextUrl;
+  console.log(`[Middleware] ${pathname} → user: ${user ? user.email : "none"}`);
 
-  // Dashboard routes require authentication
   const isDashboardRoute =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/admin") ||
@@ -52,13 +68,11 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/locations");
 
   if (!user && isDashboardRoute) {
+    console.log(`[Middleware] No user on protected route → /login`);
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
-
-  // Allow authenticated users to access login (for re-auth or logout flows)
-  // Middleware will not redirect them away from /login
 
   return supabaseResponse;
 }

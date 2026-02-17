@@ -51,7 +51,7 @@ export default function ReportIssuePage() {
         priority: priority as "low" | "medium" | "high" | "critical",
         category,
         location,
-        status: "Submitted",
+        status: "submitted",
       });
 
       if (response.error) {
@@ -62,7 +62,8 @@ export default function ReportIssuePage() {
         setTimeout(() => router.push("/issues"), 2500);
       }
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : "Failed to submit issue";
+      const errMsg =
+        err instanceof Error ? err.message : "Failed to submit issue";
       setError(errMsg);
       toast.error(errMsg);
     } finally {
@@ -88,7 +89,10 @@ export default function ReportIssuePage() {
             transition={{ delay: 0.2, type: "spring" }}
             className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-primary flex items-center justify-center shadow-lg"
           >
-            <Check className="h-4 w-4 text-primary-foreground" strokeWidth={3} />
+            <Check
+              className="h-4 w-4 text-primary-foreground"
+              strokeWidth={3}
+            />
           </motion.div>
         </motion.div>
         <motion.h2
@@ -105,7 +109,8 @@ export default function ReportIssuePage() {
           transition={{ delay: 0.4 }}
           className="text-sm text-muted-foreground mt-2 text-center max-w-sm"
         >
-          Your anonymous report has been recorded and will be reviewed by the administration.
+          Your anonymous report has been recorded and will be reviewed by the
+          administration.
         </motion.p>
         <motion.p
           initial={{ opacity: 0 }}
@@ -127,7 +132,9 @@ export default function ReportIssuePage() {
         className="space-y-1"
       >
         <h1 className="text-3xl font-bold tracking-tight">Report an Issue</h1>
-        <p className="text-muted-foreground">Submit a new anonymous report for immediate attention</p>
+        <p className="text-muted-foreground">
+          Submit a new anonymous report for immediate attention
+        </p>
       </motion.div>
 
       {/* Anonymous badge */}
@@ -142,8 +149,13 @@ export default function ReportIssuePage() {
           <ShieldCheck className="h-5 w-5 text-primary" strokeWidth={1.5} />
         </div>
         <div>
-          <span className="text-sm font-semibold text-primary block shadow-[0_0_15px_rgba(0,245,212,0.3)]">Anonymous Submission Enabled</span>
-          <span className="text-xs text-muted-foreground">Your identity is encrypted and will never be revealed to administrators</span>
+          <span className="text-sm font-semibold text-primary block shadow-[0_0_15px_rgba(0,245,212,0.3)]">
+            Anonymous Submission Enabled
+          </span>
+          <span className="text-xs text-muted-foreground">
+            Your identity is encrypted and will never be revealed to
+            administrators
+          </span>
         </div>
       </motion.div>
 
@@ -151,18 +163,26 @@ export default function ReportIssuePage() {
       <div className="flex items-center gap-0">
         {steps.map((s, i) => (
           <div key={s.num} className="flex items-center gap-3 flex-1">
-            <div className={cn(
-              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-all duration-500",
-              step >= s.num
-                ? "bg-primary text-primary-foreground shadow-[0_0_15px_rgba(0,245,212,0.4)]"
-                : "bg-muted text-muted-foreground"
-            )}>
-              {step > s.num ? <Check className="h-4 w-4" strokeWidth={2.5} /> : s.num}
+            <div
+              className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-all duration-500",
+                step >= s.num
+                  ? "bg-primary text-primary-foreground shadow-[0_0_15px_rgba(0,245,212,0.4)]"
+                  : "bg-muted text-muted-foreground",
+              )}
+            >
+              {step > s.num ? (
+                <Check className="h-4 w-4" strokeWidth={2.5} />
+              ) : (
+                s.num
+              )}
             </div>
-            <span className={cn(
-              "text-xs font-medium hidden sm:block whitespace-nowrap transition-colors duration-300",
-              step >= s.num ? "text-foreground" : "text-muted-foreground"
-            )}>
+            <span
+              className={cn(
+                "text-xs font-medium hidden sm:block whitespace-nowrap transition-colors duration-300",
+                step >= s.num ? "text-foreground" : "text-muted-foreground",
+              )}
+            >
               {s.label}
             </span>
             {i < steps.length - 1 && (
@@ -259,7 +279,10 @@ export default function ReportIssuePage() {
             className="group flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all duration-200 shadow-[0_0_20px_rgba(0,245,212,0.3)] hover:shadow-[0_0_25px_rgba(0,245,212,0.5)] active:scale-[0.98] disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed"
           >
             Next Step
-            <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" strokeWidth={2} />
+            <ChevronRight
+              className="h-4 w-4 group-hover:translate-x-0.5 transition-transform"
+              strokeWidth={2}
+            />
           </button>
         ) : (
           <button
