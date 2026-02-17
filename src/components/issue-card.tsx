@@ -5,23 +5,24 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ThumbsUp, Clock, User, ChevronRight } from "lucide-react";
 import { statusColorsAlt, priorityDot } from "@/lib/mock/constants";
+import type { DbIssue } from "@/types/db";
 
 interface IssueCardProps {
-  issue: {
-    id: number;
-    title: string;
-    status: string;
-    priority: string;
-    upvotes: number;
-    category: string;
-    location: string;
-    date: string;
-    progress: number;
-  };
+  issue: DbIssue;
   index: number;
 }
 
 export function IssueCard({ issue, index }: IssueCardProps) {
+  // Compute progress from status
+  const progressMap: Record<string, number> = {
+    submitted: 10,
+    under_review: 30,
+    in_progress: 60,
+    resolved: 100,
+    rejected: 100,
+  };
+  const progress = progressMap[issue.status] ?? 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -50,10 +51,10 @@ export function IssueCard({ issue, index }: IssueCardProps) {
           <span
             className={cn(
               "text-[10px] px-2.5 py-1 rounded-full font-semibold border",
-              statusColorsAlt[issue.status],
+              statusColorsAlt[issue.status.replace("_", " ")],
             )}
           >
-            {issue.status}
+            {issue.status.replace("_", " ")}
           </span>
         </div>
 
@@ -78,7 +79,7 @@ export function IssueCard({ issue, index }: IssueCardProps) {
         <div className="w-full h-1.5 rounded-full bg-muted/50 overflow-hidden mb-5 relative z-10">
           <motion.div
             initial={{ width: 0 }}
-            animate={{ width: `${issue.progress}%` }}
+            animate={{ width: `${progress}%` }}
             transition={{
               delay: 0.2 + index * 0.05,
               duration: 1,
@@ -86,7 +87,7 @@ export function IssueCard({ issue, index }: IssueCardProps) {
             }}
             className={cn(
               "h-full rounded-full transition-all duration-500",
-              issue.status === "Resolved" ? "bg-emerald-500" : "bg-primary",
+              issue.status === "resolved" ? "bg-emerald-500" : "bg-primary",
             )}
           />
         </div>
@@ -102,7 +103,7 @@ export function IssueCard({ issue, index }: IssueCardProps) {
           <div className="flex items-center gap-4">
             <span className="text-[11px] text-muted-foreground/60 flex items-center gap-1">
               <Clock className="h-3 w-3" strokeWidth={1.5} />
-              {issue.date}
+              {issue.created_at.split("T")[0]}
             </span>
             <span className="text-xs font-semibold flex items-center gap-1 text-foreground bg-secondary/50 px-2 py-1 rounded-lg">
               <ThumbsUp className="h-3 w-3 text-primary" strokeWidth={2} />

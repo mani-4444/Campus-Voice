@@ -8,20 +8,21 @@ import { useState, useEffect } from "react";
 
 export function AppNavbar() {
   const { theme, setTheme } = useTheme();
-  const { role, sidebarCollapsed } = useApp();
+  const { role, sidebarCollapsed, signOut } = useApp();
   const [mounted, setMounted] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
-  const roleLabel = role === "student" ? "Student" : role === "faculty" ? "Faculty" : "Admin";
+  const roleLabel =
+    role === "student" ? "Student" : role === "faculty" ? "Faculty" : "Admin";
 
   return (
     <header
       className={cn(
         "fixed top-0 right-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 backdrop-blur-xl px-6 transition-all duration-300",
-        sidebarCollapsed ? "left-[68px]" : "left-[240px]"
+        sidebarCollapsed ? "left-[68px]" : "left-[240px]",
       )}
     >
       {/* Search */}
@@ -29,7 +30,7 @@ export function AppNavbar() {
         <Search
           className={cn(
             "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors",
-            searchFocused ? "text-primary" : "text-muted-foreground"
+            searchFocused ? "text-primary" : "text-muted-foreground",
           )}
           strokeWidth={1.5}
         />
@@ -64,36 +65,41 @@ export function AppNavbar() {
           </button>
         )}
 
-          {/* Profile dropdown (moved here from sidebar) */}
-          <div className="relative">
-            <button
-              onClick={() => setShowProfileMenu((s) => !s)}
-              className="flex items-center gap-2 rounded-xl border border-border px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors duration-200"
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-                <User className="h-3.5 w-3.5 text-primary" strokeWidth={1.5} />
-              </div>
-              <div className="hidden sm:block">
-                <p className="text-xs font-medium leading-none">{roleLabel}</p>
-              </div>
-              <ChevronDown className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />
-            </button>
+        {/* Profile dropdown (moved here from sidebar) */}
+        <div className="relative">
+          <button
+            onClick={() => setShowProfileMenu((s) => !s)}
+            className="flex items-center gap-2 rounded-xl border border-border px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors duration-200"
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+              <User className="h-3.5 w-3.5 text-primary" strokeWidth={1.5} />
+            </div>
+            <div className="hidden sm:block">
+              <p className="text-xs font-medium leading-none">{roleLabel}</p>
+            </div>
+            <ChevronDown
+              className="h-3 w-3 text-muted-foreground"
+              strokeWidth={1.5}
+            />
+          </button>
 
-            {showProfileMenu && (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card p-2 shadow-lg z-50">
-                <a href="/profile" className="block px-3 py-2 text-sm text-foreground hover:bg-muted rounded-md">View Profile</a>
-                <button
-                  onClick={() => {
-                    localStorage.removeItem("app-role");
-                    window.location.href = "/";
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-md"
-                >
-                  Log Out
-                </button>
-              </div>
-            )}
-          </div>
+          {showProfileMenu && (
+            <div className="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card p-2 shadow-lg z-50">
+              <a
+                href="/profile"
+                className="block px-3 py-2 text-sm text-foreground hover:bg-muted rounded-md"
+              >
+                View Profile
+              </a>
+              <button
+                onClick={() => signOut()}
+                className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-md"
+              >
+                Log Out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

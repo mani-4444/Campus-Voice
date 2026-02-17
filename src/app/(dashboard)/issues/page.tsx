@@ -1,20 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Search,
   SlidersHorizontal,
   LayoutGrid,
   List,
   ThumbsUp,
+  Loader,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { IssueCard } from "@/components/issue-card";
 import { IssueListItem } from "@/components/issue-list-item";
-import { issues } from "@/lib/mock/issues";
 import { filterCategories, filterStatuses } from "@/lib/mock/constants";
 import { useApp } from "@/components/app-context";
+import { getIssues } from "@/lib/services/issues";
+import type { DbIssue } from "@/types/db";
 
 export default function IssueListPage() {
   const { role } = useApp();
@@ -25,6 +28,29 @@ export default function IssueListPage() {
   const [filterMyUpvoted, setFilterMyUpvoted] = useState(false);
   const [filterEscalated, setFilterEscalated] = useState(false);
   const [filterReporter, setFilterReporter] = useState("All");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [issues, setIssues] = useState<DbIssue[]>([]);
+
+  useEffect(() => {
+    async function fetchIssues() {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await getIssues();
+        if (response.error) {
+          setError(response.error);
+        } else if (response.data) {
+          setIssues(response.data);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load issues");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchIssues();
+  }, []);
 
   const filtered = issues.filter((issue) => {
     // 1. Role-based visibility
@@ -38,22 +64,21 @@ export default function IssueListPage() {
     // 2. Standard filters
     if (activeCategory !== "All" && issue.category !== activeCategory)
       return false;
-    if (activeStatus !== "All" && issue.status !== activeStatus) return false;
+    if (
+      activeStatus !== "All" &&
+      issue.status.replace("_", " ") !== activeStatus
+    )
+      return false;
     if (search && !issue.title.toLowerCase().includes(search.toLowerCase()))
       return false;
 
     // 3. Advanced toggles
-    if (filterMyUpvoted && ![1, 4, 7].includes(issue.id)) return false; // Mocking "My Upvoted"
-    // Mocking "Escalated" check - assuming high priority or specific keyword in title/status
+    if (filterMyUpvoted) return false; // TODO: Check user's votes from DB
+    // Mocking "Escalated" check - High > medium priority
     if (
       filterEscalated &&
-      issue.priority !== "Critical" &&
-      issue.priority !== "High"
-    )
-      return false;
-    if (
-      filterReporter !== "All" &&
-      issue.reporter !== filterReporter.toLowerCase()
+      issue.priority !== "critical" &&
+      issue.priority !== "high"
     )
       return false;
 
@@ -97,174 +122,200 @@ export default function IssueListPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1 min-w-[200px] max-w-md">
-            <Search
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-              strokeWidth={1.5}
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search issues..."
-              className="w-full rounded-xl border border-border bg-card py-2.5 pl-10 pr-4 text-sm placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200 shadow-sm"
-            />
-          </div>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-card text-xs text-muted-foreground shadow-sm">
-            <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} />
-            <span>Active filters: {filtered.length} results</span>
+      {/* Loading State */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <Loader className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading issues...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !loading && (
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 flex items-start gap-4">
+          <AlertCircle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+          <div>
+            <h3 className="font-semibold text-destructive mb-1">
+              Failed to load issues
+            </h3>
+            <p className="text-sm text-muted-foreground">{error}</p>
           </div>
         </div>
+      )}
 
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold mr-2">
-            Category:
-          </span>
-          {filterCategories
-            .filter(
-              (cat) =>
-                role !== "faculty" ||
-                (cat !== "Hostel" && cat !== "Transportation"),
-            )
-            .map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 border",
-                  activeCategory === cat
-                    ? "bg-primary/10 text-primary border-primary/20"
-                    : "bg-card text-muted-foreground border-border/50 hover:border-border hover:text-foreground",
-                )}
-              >
-                {cat}
-              </button>
-            ))}
-        </div>
-
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold mr-2">
-            Status:
-          </span>
-          {filterStatuses.map((st) => (
-            <button
-              key={st}
-              onClick={() => setActiveStatus(st)}
-              className={cn(
-                "rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 border",
-                activeStatus === st
-                  ? "bg-primary/10 text-primary border-primary/20"
-                  : "bg-card text-muted-foreground border-border/50 hover:border-border hover:text-foreground",
-              )}
-            >
-              {st}
-            </button>
-          ))}
-        </div>
-
-        {/* Reporter filter for faculty: Student vs Faculty issues */}
-        {role === "faculty" && (
-          <div className="flex flex-wrap gap-2 items-center pt-2">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold mr-2">
-              Reporter:
-            </span>
-            {[
-              { key: "All", label: "All" },
-              { key: "student", label: "Student" },
-              { key: "faculty", label: "Faculty" },
-            ].map((r) => (
-              <button
-                key={r.key}
-                onClick={() =>
-                  setFilterReporter(r.key === "All" ? "All" : r.key)
-                }
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 border",
-                  filterReporter === (r.key === "All" ? "All" : r.key)
-                    ? "bg-primary/10 text-primary border-primary/20"
-                    : "bg-card text-muted-foreground border-border/50 hover:border-border hover:text-foreground",
-                )}
-              >
-                {r.label}
-              </button>
-            ))}
+      {/* Content */}
+      {!loading && !error && (
+        <>
+          {/* Filters */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Search
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                strokeWidth={1.5}
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search issues..."
+                className="w-full rounded-xl border border-border bg-card py-2.5 pl-10 pr-4 text-sm placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200 shadow-sm"
+              />
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-card text-xs text-muted-foreground shadow-sm">
+              <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} />
+              <span>Active filters: {filtered.length} results</span>
+            </div>
           </div>
-        )}
 
-        {/* Advanced Filters */}
-        <div className="flex flex-wrap gap-3 items-center pt-2 border-t border-border/50">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold mr-2">
-            Quick Filters:
-          </span>
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold mr-2">
+                Category:
+              </span>
+              {filterCategories
+                .filter(
+                  (cat) =>
+                    role !== "faculty" ||
+                    (cat !== "Hostel" && cat !== "Transportation"),
+                )
+                .map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={cn(
+                      "rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 border",
+                      activeCategory === cat
+                        ? "bg-primary/10 text-primary border-primary/20"
+                        : "bg-card text-muted-foreground border-border/50 hover:border-border hover:text-foreground",
+                    )}
+                  >
+                    {cat}
+                  </button>
+                ))}
+            </div>
 
-          <button
-            onClick={() => setFilterMyUpvoted(!filterMyUpvoted)}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 border",
-              filterMyUpvoted
-                ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                : "bg-card text-muted-foreground border-border/50 hover:border-border",
-            )}
-          >
-            <ThumbsUp className="h-3 w-3" strokeWidth={1.5} />
-            My Upvoted
-          </button>
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold mr-2">
+                Status:
+              </span>
+              {filterStatuses.map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setActiveStatus(st)}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 border",
+                    activeStatus === st
+                      ? "bg-primary/10 text-primary border-primary/20"
+                      : "bg-card text-muted-foreground border-border/50 hover:border-border hover:text-foreground",
+                  )}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
 
-          <button
-            onClick={() => setFilterEscalated(!filterEscalated)}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 border",
-              filterEscalated
-                ? "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20"
-                : "bg-card text-muted-foreground border-border/50 hover:border-border",
-            )}
-          >
-            ⚠️ Escalated / Critical
-          </button>
-        </div>
-      </div>
-
-      {/* Issue Cards */}
-      <AnimatePresence mode="wait">
-        {viewMode === "grid" ? (
-          <motion.div
-            key="grid"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
-          >
-            {filtered.map((issue, i) => (
-              <IssueCard key={issue.id} issue={issue} index={i} />
-            ))}
-            {filtered.length === 0 && (
-              <div className="col-span-full py-20 text-center text-muted-foreground">
-                No issues found matching your filters.
+            {/* Reporter filter for faculty: Student vs Faculty issues */}
+            {role === "faculty" && (
+              <div className="flex flex-wrap gap-2 items-center pt-2">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold mr-2">
+                  Reporter:
+                </span>
+                {[
+                  { key: "All", label: "All" },
+                  { key: "student", label: "Student" },
+                  { key: "faculty", label: "Faculty" },
+                ].map((r) => (
+                  <button
+                    key={r.key}
+                    onClick={() =>
+                      setFilterReporter(r.key === "All" ? "All" : r.key)
+                    }
+                    className={cn(
+                      "rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 border",
+                      filterReporter === (r.key === "All" ? "All" : r.key)
+                        ? "bg-primary/10 text-primary border-primary/20"
+                        : "bg-card text-muted-foreground border-border/50 hover:border-border hover:text-foreground",
+                    )}
+                  >
+                    {r.label}
+                  </button>
+                ))}
               </div>
             )}
-          </motion.div>
-        ) : (
-          <motion.div
-            key="list"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm"
-          >
-            {filtered.map((issue, i) => (
-              <IssueListItem key={issue.id} issue={issue} index={i} />
-            ))}
-            {filtered.length === 0 && (
-              <div className="py-20 text-center text-muted-foreground">
-                No issues found matching your filters.
-              </div>
+
+            {/* Advanced Filters */}
+            <div className="flex flex-wrap gap-3 items-center pt-2 border-t border-border/50">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold mr-2">
+                Quick Filters:
+              </span>
+
+              <button
+                onClick={() => setFilterMyUpvoted(!filterMyUpvoted)}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 border",
+                  filterMyUpvoted
+                    ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                    : "bg-card text-muted-foreground border-border/50 hover:border-border",
+                )}
+              >
+                <ThumbsUp className="h-3 w-3" strokeWidth={1.5} />
+                My Upvoted
+              </button>
+
+              <button
+                onClick={() => setFilterEscalated(!filterEscalated)}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 border",
+                  filterEscalated
+                    ? "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20"
+                    : "bg-card text-muted-foreground border-border/50 hover:border-border",
+                )}
+              >
+                ⚠️ Escalated / Critical
+              </button>
+            </div>
+          </div>
+
+          {/* Issue Cards */}
+          <AnimatePresence mode="wait">
+            {viewMode === "grid" ? (
+              <motion.div
+                key="grid"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
+              >
+                {filtered.map((issue, i) => (
+                  <IssueCard key={issue.id} issue={issue} index={i} />
+                ))}
+                {filtered.length === 0 && (
+                  <div className="col-span-full py-20 text-center text-muted-foreground">
+                    No issues found matching your filters.
+                  </div>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="list"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm"
+              >
+                {filtered.map((issue, i) => (
+                  <IssueListItem key={issue.id} issue={issue} index={i} />
+                ))}
+                {filtered.length === 0 && (
+                  <div className="py-20 text-center text-muted-foreground">
+                    No issues found matching your filters.
+                  </div>
+                )}
+              </motion.div>
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </AnimatePresence>
+        </>
+      )}
     </div>
   );
 }

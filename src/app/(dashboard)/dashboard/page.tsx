@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
   FileText,
   ThumbsUp,
@@ -11,6 +12,8 @@ import {
   ArrowUpRight,
   Activity,
   Zap,
+  Loader,
+  AlertCircle,
 } from "lucide-react";
 import {
   XAxis,
@@ -21,9 +24,10 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { issues } from "@/lib/mock/issues";
 import { chartData, recentActivity } from "@/lib/mock/analytics";
 import { statusColors, priorityColors } from "@/lib/mock/constants";
+import { getIssues } from "@/lib/services/issues";
+import type { DbIssue } from "@/types/db";
 
 const stats = [
   {
@@ -56,11 +60,34 @@ const stats = [
   },
 ];
 
-const trendingIssues = issues.slice(0, 5);
-
 export default function StudentDashboard() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [trendingIssues, setTrendingIssues] = useState<DbIssue[]>([]);
+
+  useEffect(() => {
+    async function fetchTrendingIssues() {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await getIssues();
+        if (response.error) {
+          setError(response.error);
+        } else if (response.data) {
+          setTrendingIssues(response.data.slice(0, 5));
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load issues");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchTrendingIssues();
+  }, []);
+
   return (
-    <div className="space-y-6 max-w-7xl">
+    <div className="space-y-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="animate-slide-up">
@@ -217,45 +244,65 @@ export default function StudentDashboard() {
               View All
             </Link>
           </div>
-          <div className="space-y-1">
-            {trendingIssues.map((issue, i) => (
-              <Link
-                key={issue.id}
-                href={`/issues/${issue.id}`}
-                className="flex items-start gap-3 rounded-xl p-3 -mx-1 hover:bg-muted/50 transition-all duration-200 group"
-              >
-                <span className="text-[10px] font-mono text-muted-foreground/60 mt-1 w-4 shrink-0 text-right">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate group-hover:text-primary transition-colors duration-200">
-                    {issue.title}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColors[issue.status]}`}
-                    >
-                      {issue.status}
-                    </span>
-                    <span
-                      className={`text-[10px] font-medium ${priorityColors[issue.priority]}`}
-                    >
-                      {issue.priority}
+
+          {loading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader className="h-5 w-5 animate-spin text-primary" />
+            </div>
+          )}
+
+          {error && !loading && (
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-destructive/5 border border-destructive/20">
+              <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+              <p className="text-[12px] text-muted-foreground">{error}</p>
+            </div>
+          )}
+
+          {!loading && !error && (
+            <div className="space-y-1">
+              {trendingIssues.map((issue, i) => (
+                <Link
+                  key={issue.id}
+                  href={`/issues/${issue.id}`}
+                  className="flex items-start gap-3 rounded-xl p-3 -mx-1 hover:bg-muted/50 transition-all duration-200 group"
+                >
+                  <span className="text-[10px] font-mono text-muted-foreground/60 mt-1 w-4 shrink-0 text-right">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate group-hover:text-primary transition-colors duration-200">
+                      {issue.title}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          statusColors[issue.status.replace("_", " ")]
+                        }`}
+                      >
+                        {issue.status.replace("_", " ")}
+                      </span>
+                      <span
+                        className={`text-[10px] font-medium ${
+                          priorityColors[issue.priority]
+                        }`}
+                      >
+                        {issue.priority}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                    <ThumbsUp
+                      className="h-3 w-3 text-muted-foreground/60"
+                      strokeWidth={1.5}
+                    />
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      {issue.upvotes}
                     </span>
                   </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0 mt-0.5">
-                  <ThumbsUp
-                    className="h-3 w-3 text-muted-foreground/60"
-                    strokeWidth={1.5}
-                  />
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    {issue.upvotes}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

@@ -5,18 +5,10 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ThumbsUp, User } from "lucide-react";
 import { statusColorsAlt, priorityDot } from "@/lib/mock/constants";
+import type { DbIssue } from "@/types/db";
 
 interface IssueListItemProps {
-  issue: {
-    id: number;
-    title: string;
-    status: string;
-    priority: string;
-    upvotes: number;
-    category: string;
-    location: string;
-    date: string;
-  };
+  issue: DbIssue;
   index: number;
 }
 
@@ -44,7 +36,7 @@ export function IssueListItem({ issue, index }: IssueListItemProps) {
           </p>
           <div className="flex items-center gap-2 mt-1.5 align-middle">
             <span className="text-[10px] font-mono text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
-              #{String(issue.id).padStart(3, "0")}
+              #{issue.id.slice(0, 8)}
             </span>
             <span className="text-muted-foreground/30">·</span>
             <span className="text-[10px] text-muted-foreground font-medium">
@@ -61,10 +53,10 @@ export function IssueListItem({ issue, index }: IssueListItemProps) {
         <span
           className={cn(
             "text-[10px] px-2.5 py-1 rounded-full font-semibold shrink-0 border",
-            statusColorsAlt[issue.status],
+            statusColorsAlt[issue.status.replace("_", " ")],
           )}
         >
-          {issue.status}
+          {issue.status.replace("_", " ")}
         </span>
 
         <div className="flex items-center gap-1.5 shrink-0 min-w-[3rem] justify-end">
@@ -78,7 +70,7 @@ export function IssueListItem({ issue, index }: IssueListItemProps) {
         </div>
 
         <span className="text-[11px] text-muted-foreground/60 shrink-0 hidden sm:block w-20 text-right">
-          {issue.date}
+          {issue.created_at.split("T")[0]}
         </span>
       </Link>
     </motion.div>
