@@ -57,12 +57,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users away from login
-  if (user && pathname === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
-  }
+  // Allow authenticated users to access login (for re-auth or logout flows)
+  // Middleware will not redirect them away from /login
 
   return supabaseResponse;
 }

@@ -8,12 +8,15 @@ import {
   ShieldCheck,
   Check,
   Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import { StepCategoryLocation } from "./step-category-location";
 import { StepDetails } from "./step-details";
 import { StepReview } from "./step-review";
+import { createIssue } from "@/lib/services/issues";
 
 export default function ReportIssuePage() {
   const [step, setStep] = useState(1);
@@ -23,6 +26,7 @@ export default function ReportIssuePage() {
   const [priority, setPriority] = useState("medium");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const steps = [
@@ -31,13 +35,39 @@ export default function ReportIssuePage() {
     { num: 3, label: "Review & Submit" },
   ];
 
-  const handleSubmit = () => {
-    setSubmitting(true);
-    setTimeout(() => {
+  const handleSubmit = async () => {
+    if (!category || !location || !description.trim()) {
+      setError("Please fill in all required fields");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError(null);
+
+      const response = await createIssue({
+        title: `${category} issue at ${location}`,
+        description,
+        priority: priority as "low" | "medium" | "high" | "critical",
+        category,
+        location,
+        status: "Submitted",
+      });
+
+      if (response.error) {
+        setError(response.error);
+        toast.error(response.error);
+      } else if (response.data) {
+        setSubmitted(true);
+        setTimeout(() => router.push("/issues"), 2500);
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Failed to submit issue";
+      setError(errMsg);
+      toast.error(errMsg);
+    } finally {
       setSubmitting(false);
-      setSubmitted(true);
-      setTimeout(() => router.push("/issues"), 2500);
-    }, 1500);
+    }
   };
 
   if (submitted) {
@@ -148,6 +178,22 @@ export default function ReportIssuePage() {
           </div>
         ))}
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 flex items-start gap-3"
+        >
+          <AlertCircle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+          <div>
+            <h4 className="font-semibold text-destructive text-sm">Error</h4>
+            <p className="text-xs text-muted-foreground mt-1">{error}</p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Step Content */}
       <div className="min-h-[400px]">

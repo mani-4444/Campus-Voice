@@ -1,113 +1,216 @@
 // ──────────────────────────────────────────────
-// Issues service layer
-// Currently returns mock data. Each function is
-// typed to match the DB schema so swapping to real
-// Supabase queries is a drop-in replacement.
+// Issues service layer - Connected to Supabase
+// Backend integration guide: see BACKEND_SETUP.md
 // ──────────────────────────────────────────────
 
 import type { DbIssue, DbIssueUpdate, DbIssueVote } from "@/types/db";
 import type { ApiResponse } from "@/lib/api";
 import { ok, err } from "@/lib/api";
-import { issues, getTimelineForIssue, getUpdatesForIssue } from "@/lib/mock";
+import { createClient } from "@/lib/supabase/client";
+
+const debugApiErrors = true; // Set to false in production
+
+// Helper to provide user-friendly errors
+function handleDbError(error: any, operation: string): string {
+  const message = error?.message || error?.toString() || "Unknown error";
+  
+  if (message.includes("relation") || message.includes("does not exist")) {
+    return `Database tables not initialized. See BACKEND_SETUP.md for setup instructions.`;
+  }
+  if (message.includes("permission denied") || message.includes("policy")) {
+    return `Access denied. Check RLS policies in Supabase.`;
+  }
+  if (debugApiErrors) {
+    console.error(`[${operation}] DB Error:`, message);
+  }
+  return message;
+}
 
 // ── Queries ──────────────────────────────────
 
 export async function getIssues(): Promise<ApiResponse<DbIssue[]>> {
-  // TODO: replace with supabase.from("issues").select("*")
-  const mapped: DbIssue[] = issues.map((i) => ({
-    id: i.id,
-    title: i.title,
-    description: i.description,
-    status: i.status.replace(" ", "_") as DbIssue["status"],
-    priority: i.priority as DbIssue["priority"],
-    category: i.category,
-    location: i.location,
-    reporter_id: null,
-    assigned_to: null,
-    upvotes: i.upvotes,
-    progress: i.progress,
-    created_at: i.date,
-    updated_at: i.date,
-  }));
-  return ok(mapped);
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase.from("issues").select("*");
+    
+    if (error) return err(handleDbError(error, "getIssues"));
+    if (!data) return ok([]);
+    
+    return ok(data as DbIssue[]);
+  } catch (error) {
+    return err(handleDbError(error, "getIssues"));
+  }
 }
 
 export async function getIssueById(
   issueId: number,
 ): Promise<ApiResponse<DbIssue | null>> {
-  const issue = issues.find((i) => i.id === issueId);
-  if (!issue) return err("Issue not found");
-
-  const mapped: DbIssue = {
-    id: issue.id,
-    title: issue.title,
-    description: issue.description,
-    status: issue.status.replace(" ", "_") as DbIssue["status"],
-    priority: issue.priority as DbIssue["priority"],
-    category: issue.category,
-    location: issue.location,
-    reporter_id: null,
-    assigned_to: null,
-    upvotes: issue.upvotes,
-    progress: issue.progress,
-    created_at: issue.date,
-    updated_at: issue.date,
-  };
-  return ok(mapped);
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("issues")
+      .select("*")
+      .eq("id", issueId)
+      .single();
+    
+    if (error) {
+      if (error.code === "PGRST116") return ok(null); // Not found
+      return err(handleDbError(error, "getIssueById"));
+    }
+    
+    return ok(data as DbIssue);
+  } catch (error) {
+    return err(handleDbError(error, "getIssueById"));
+  }
 }
 
 export async function getIssueTimeline(
   issueId: number,
 ): Promise<ApiResponse<DbIssueUpdate[]>> {
-  // TODO: replace with supabase query
-  const steps = getTimelineForIssue(issueId);
-  const mapped: DbIssueUpdate[] = steps.map((s, idx) => ({
-    id: idx + 1,
-    issue_id: issueId,
-    author: s.label,
-    message: s.description,
-    type: "system" as DbIssueUpdate["type"],
-    created_at: s.date,
-  }));
-  return ok(mapped);
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("issue_updates")
+      .select("*")
+      .eq("issue_id", issueId)
+      .eq("type", "system")
+      .order("created_at", { ascending: true });
+    
+    if (error) return err(handleDbError(error, "getIssueTimeline"));
+    if (!data) return ok([]);
+    
+    return ok(data as DbIssueUpdate[]);
+  } catch (error) {
+    return err(handleDbError(error, "getIssueTimeline"));
+  }
 }
 
 export async function getIssueAdminUpdates(
   issueId: number,
 ): Promise<ApiResponse<DbIssueUpdate[]>> {
-  const updates = getUpdatesForIssue(issueId);
-  const mapped: DbIssueUpdate[] = updates.map((u) => ({
-    id: u.id ?? 0,
-    issue_id: u.issueId ?? issueId,
-    author: u.author,
-    message: u.message,
-    type: "update",
-    created_at: u.time,
-  }));
-  return ok(mapped);
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("issue_updates")
+      .select("*")
+      .eq("issue_id", issueId)
+      .neq("type", "system")
+      .order("created_at", { ascending: false });
+    
+    if (error) return err(handleDbError(error, "getIssueAdminUpdates"));
+    if (!data) return ok([]);
+    
+    return ok(data as DbIssueUpdate[]);
+  } catch (error) {
+    return err(handleDbError(error, "getIssueAdminUpdates"));
+  }
 }
 
 // ── Mutations ────────────────────────────────
 
 export async function createIssue(
-  _payload: Partial<DbIssue>,
+  payload: Partial<DbIssue>,
 ): Promise<ApiResponse<DbIssue>> {
-  // TODO: replace with supabase.from("issues").insert(payload)
-  return err("Not implemented — backend not connected");
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase.from("issues").insert([
+      {
+        title: payload.title ?? "Untitled",
+        description: payload.description ?? "",
+        status: payload.status ?? "submitted",
+        priority: payload.priority ?? "medium",
+        category: payload.category ?? "Other",
+        location: payload.location ?? "Unknown",
+        reporter_id: payload.reporter_id ?? null,
+        upvotes: 0,
+        progress: 0,
+      },
+    ]).select().single();
+    
+    if (error) return err(handleDbError(error, "createIssue"));
+    if (!data) return err("Failed to create issue");
+    
+    return ok(data as DbIssue);
+  } catch (error) {
+    return err(handleDbError(error, "createIssue"));
+  }
 }
 
 export async function upvoteIssue(
-  _issueId: number,
-  _userId: string,
+  issueId: number,
+  userId: string,
 ): Promise<ApiResponse<DbIssueVote>> {
-  // TODO: replace with supabase.from("issue_votes").insert(...)
-  return err("Not implemented — backend not connected");
+  try {
+    const supabase = createClient();
+    
+    // Check if vote already exists
+    const { data: existing, error: fetchError } = await supabase
+      .from("issue_votes")
+      .select("*")
+      .eq("issue_id", issueId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    
+    if (fetchError) return err(handleDbError(fetchError, "upvoteIssue:check"));
+    
+    // If already voted, remove the vote
+    if (existing) {
+      const { error: deleteError } = await supabase
+        .from("issue_votes")
+        .delete()
+        .eq("id", existing.id);
+      
+      if (deleteError) return err(handleDbError(deleteError, "upvoteIssue:delete"));
+      return ok(existing as DbIssueVote);
+    }
+    
+    // Otherwise, add new vote
+    const { data, error } = await supabase
+      .from("issue_votes")
+      .insert([{ issue_id: issueId, user_id: userId }])
+      .select()
+      .single();
+    
+    if (error) return err(handleDbError(error, "upvoteIssue:insert"));
+    if (!data) return err("Failed to create vote");
+    
+    return ok(data as DbIssueVote);
+  } catch (error) {
+    return err(handleDbError(error, "upvoteIssue"));
+  }
+}
+
+export async function toggleUpvote(
+  issueId: number,
+  userId: string,
+): Promise<ApiResponse<DbIssueVote>> {
+  return upvoteIssue(issueId, userId);
 }
 
 export async function addIssueUpdate(
-  _issueId: number,
-  _update: Partial<DbIssueUpdate>,
+  issueId: number,
+  update: Partial<DbIssueUpdate>,
 ): Promise<ApiResponse<DbIssueUpdate>> {
-  // TODO: replace with supabase.from("issue_updates").insert(...)
-  return err("Not implemented — backend not connected");
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("issue_updates")
+      .insert([
+        {
+          issue_id: issueId,
+          author: update.author ?? "System",
+          message: update.message ?? "",
+          type: update.type ?? "update",
+        },
+      ])
+      .select()
+      .single();
+    
+    if (error) return err(handleDbError(error, "addIssueUpdate"));
+    if (!data) return err("Failed to create update");
+    
+    return ok(data as DbIssueUpdate);
+  } catch (error) {
+    return err(handleDbError(error, "addIssueUpdate"));
+  }
 }

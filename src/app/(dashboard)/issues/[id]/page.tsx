@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -15,6 +15,8 @@ import {
   Share2,
   MoreVertical,
   AlertTriangle,
+  Loader,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,19 +25,27 @@ import { Timeline } from "@/components/timeline";
 import { AdminChat } from "@/components/admin-chat";
 import {
   getIssueById,
-  getTimelineForIssue,
-  getUpdatesForIssue,
-} from "@/lib/mock/issues";
+  getIssueTimeline,
+  getIssueAdminUpdates,
+  toggleUpvote,
+} from "@/lib/services/issues";
 import { useApp } from "@/components/app-context";
+import type { DbIssue, DbIssueUpdate } from "@/types/db";
 
 export default function IssueDetailPage() {
   const params = useParams<{ id: string }>();
   const issueId = Number(params.id);
-  const issue = getIssueById(issueId);
-  const issueTimeline = getTimelineForIssue(issueId);
-  const issueAdminUpdates = getUpdatesForIssue(issueId);
+  const { role } = useApp();
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [issue, setIssue] = useState<DbIssue | null>(null);
+  const [timeline, setTimeline] = useState<DbIssueUpdate[]>([]);
+  const [adminUpdates, setAdminUpdates] = useState<DbIssueUpdate[]>([]);
+
   const [upvoted, setUpvoted] = useState(false);
-  const [upvoteCount, setUpvoteCount] = useState(issue?.upvotes ?? 0);
+  const [upvoting, setUpvoting] = useState(false);
+  const [upvoteCount, setUpvoteCount] = useState(0);
 
   const [showReportFalse, setShowReportFalse] = useState(false);
   const [falseReason, setFalseReason] = useState("");
@@ -43,12 +53,43 @@ export default function IssueDetailPage() {
   const [showResolve, setShowResolve] = useState(false);
   const [resolveNote, setResolveNote] = useState("");
 
-  const { role } = useApp();
   const [adminUpdateText, setAdminUpdateText] = useState("");
 
-  const reporter = issue?.reporter ?? "student";
-  const issueReporterId =
-    reporter === "faculty" ? "faculty-001" : "student-001";
+  // Load issue data on mount
+  useEffect(() => {
+    async function fetchIssueData() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const issueRes = await getIssueById(issueId);
+        if (issueRes.error) {
+          setError(issueRes.error);
+          return;
+        }
+
+        setIssue(issueRes.data);
+        setUpvoteCount(issueRes.data?.upvotes ?? 0);
+
+        const [timelineRes, updatesRes] = await Promise.all([
+          getIssueTimeline(issueId),
+          getIssueAdminUpdates(issueId),
+        ]);
+
+        if (timelineRes.data) setTimeline(timelineRes.data);
+        if (updatesRes.data) setAdminUpdates(updatesRes.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load issue");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchIssueData();
+  }, [issueId]);
+
+  const reporter = issue?.reporter_id ? "faculty" : "student";
+  const issueReporterId = issue?.reporter_id ?? "student-001";
   const currentUserId = role === "faculty" ? "faculty-001" : "student-001";
   const isIssueOwner = role === reporter && currentUserId === issueReporterId;
   const canUpvote =
@@ -58,10 +99,62 @@ export default function IssueDetailPage() {
     (reporter === "student" && role === "student") ||
     (reporter === "faculty" && role === "faculty" && isIssueOwner);
 
-  const handleUpvote = () => {
-    setUpvoted(!upvoted);
-    setUpvoteCount(upvoted ? upvoteCount - 1 : upvoteCount + 1);
+  const handleUpvote = async () => {
+    if (!issue || upvoting) return;
+    try {
+      setUpvoting(true);
+      const newState = !upvoted;
+      const response = await toggleUpvote(issue.id, currentUserId);
+
+      if (response.error) {
+        toast.error(response.error);
+      } else {
+        setUpvoted(newState);
+        setUpvoteCount(newState ? upvoteCount + 1 : upvoteCount - 1);
+        toast.success(newState ? "Issue upvoted" : "Upvote removed");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upvote failed");
+    } finally {
+      setUpvoting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto flex flex-col items-center justify-center py-20 gap-4">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Loading issue...</p>
+      </div>
+    );
+  }
+
+  if (error || !issue) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-8">
+        <Link
+          href="/issues"
+          className="group inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <div className="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+            <ArrowLeft className="h-4 w-4" strokeWidth={2} />
+          </div>
+          Back to Issues
+        </Link>
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 flex items-start gap-4">
+          <AlertCircle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+          <div>
+            <h3 className="font-semibold text-destructive mb-1">
+              Failed to load issue
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {error || "Issue not found"}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -106,7 +199,7 @@ export default function IssueDetailPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-4 flex-wrap">
               <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                {issue?.status ?? "Unknown"}
+                {issue?.status.replace("_", " ") ?? "Unknown"}
               </span>
               <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--warning)] px-2.5 py-1 rounded-md bg-[var(--warning)]/10 border border-[var(--warning)]/20 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
                 {issue?.priority ?? "—"} Priority
@@ -142,7 +235,7 @@ export default function IssueDetailPage() {
               </div>
               <div className="flex items-center gap-1.5 px-2">
                 <Clock className="h-3.5 w-3.5" strokeWidth={1.5} />
-                {issue?.date ?? "—"}
+                {issue?.created_at.split('T')[0] ?? "—"}
               </div>
             </div>
           </div>
@@ -201,7 +294,7 @@ export default function IssueDetailPage() {
               </p>
             </div>
           </div>
-          <Timeline steps={issueTimeline} />
+          <Timeline steps={timeline} />
         </motion.div>
 
         {/* Admin Updates */}
@@ -224,11 +317,11 @@ export default function IssueDetailPage() {
               </div>
             </div>
             <span className="text-[10px] font-mono bg-muted px-2 py-1 rounded border border-border/50">
-              {issueAdminUpdates.length} ENTRIES
+              {adminUpdates.length} ENTRIES
             </span>
           </div>
 
-          <AdminChat updates={issueAdminUpdates} />
+          <AdminChat updates={adminUpdates} />
 
           <div className="mt-6 pt-6 border-t border-border/50">
             {role === "admin" ? (

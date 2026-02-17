@@ -41,19 +41,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [authLoading, setAuthLoading] = useState(true);
   const supabase = createClient();
 
-  // Fetch profile role from Supabase
+  // Fetch profile role from Supabase (with fallback to localStorage)
   const fetchProfile = useCallback(
     async (userId: string) => {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", userId)
-        .single();
-      if (
-        profile?.role &&
-        ["student", "faculty", "admin"].includes(profile.role)
-      ) {
-        setRoleState(profile.role as UserRole);
+      try {
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .single();
+        
+        if (error) {
+          console.warn("Profile fetch error (expected if DB not set up):", error.message);
+          // Use role from localStorage if available
+          const savedRole = localStorage.getItem("app-role") as UserRole;
+          if (savedRole && ["student", "faculty", "admin"].includes(savedRole)) {
+            setRoleState(savedRole);
+          }
+          return;
+        }
+        
+        if (profile?.role && ["student", "faculty", "admin"].includes(profile.role)) {
+          setRoleState(profile.role as UserRole);
+          localStorage.setItem("app-role", profile.role);
+        }
+      } catch (err) {
+        console.warn("Error fetching profile:", err);
+        // Fallback to localStorage
+        const savedRole = localStorage.getItem("app-role") as UserRole;
+        if (savedRole && ["student", "faculty", "admin"].includes(savedRole)) {
+          setRoleState(savedRole);
+        }
       }
     },
     [supabase],
@@ -117,10 +135,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      // Clear the Supabase session
+      const { error } = await supabase.auth.signOut();
+      if (error) console.error("Logout error:", error);
+    } catch (err) {
+      console.error("Logout exception:", err);
+    }
+    
+    // Clear local state
     setUser(null);
     setRoleState("student");
     localStorage.removeItem("app-role");
+    
+    // Redirect to login
     window.location.href = "/login";
   };
 

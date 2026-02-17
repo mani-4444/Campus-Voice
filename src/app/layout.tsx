@@ -6,15 +6,16 @@ import { AppProvider } from "@/components/app-context";
 import { Toaster } from "@/components/ui/sonner";
 
 // orchids-visual-edits is optional — only loaded if installed in dev
-let VisualEditsMessenger: React.ComponentType = () => null;
-if (process.env.NODE_ENV === "development") {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    VisualEditsMessenger = require("orchids-visual-edits").VisualEditsMessenger;
-  } catch {
-    // Package not installed — skip silently
-  }
-}
+// Commented out due to build issues with optional dependency resolution
+// let VisualEditsMessenger: React.ComponentType = () => null;
+// if (process.env.NODE_ENV === "development") {
+//   try {
+//     // eslint-disable-next-line @typescript-eslint/no-require-imports
+//     VisualEditsMessenger = require("orchids-visual-edits").VisualEditsMessenger;
+//   } catch {
+//     // Package not installed — skip silently
+//   }
+// }
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -40,7 +41,6 @@ export default function RootLayout({
             {children}
             <Toaster />
           </AppProvider>
-          <VisualEditsMessenger />
         </ThemeProvider>
       </body>
     </html>
