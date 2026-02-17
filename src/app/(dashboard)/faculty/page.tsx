@@ -14,6 +14,8 @@ import { FacultyActionItems } from "@/components/faculty-action-items";
 import { AnalyticsCharts } from "@/components/analytics-charts";
 import Link from "next/link";
 import { sentimentData, departmentData } from "@/lib/mock/analytics";
+// Faculty-specific service imports - edit faculty-issues.ts for backend changes
+import { getAssignedIssues, getHighPriorityIssues } from "@/lib/services/faculty-issues";
 
 const stats = [
   {

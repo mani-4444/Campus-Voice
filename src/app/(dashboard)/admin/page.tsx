@@ -24,6 +24,8 @@ import { AuditLog } from "@/components/audit-log";
 import { UserManagementTable } from "@/components/user-management-table";
 import { issues } from "@/lib/mock/issues";
 import { statusColors, priorityColors } from "@/lib/mock/constants";
+// Admin-specific service imports - edit admin-issues.ts for backend changes
+import { getAllIssues, getIssueAnalytics, bulkUpdateIssues } from "@/lib/services/admin-issues";
 
 const stats = [
   {

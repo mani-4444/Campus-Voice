@@ -26,7 +26,7 @@ import {
 } from "recharts";
 import { chartData, recentActivity } from "@/lib/mock/analytics";
 import { statusColors, priorityColors } from "@/lib/mock/constants";
-import { getIssues } from "@/lib/services/issues";
+import { getStudentIssues } from "@/lib/services/student-issues";
 import type { DbIssue } from "@/types/db";
 
 const stats = [
@@ -70,7 +70,7 @@ export default function StudentDashboard() {
       try {
         setLoading(true);
         setError(null);
-        const response = await getIssues();
+        const response = await getStudentIssues();
         if (response.error) {
           setError(response.error);
         } else if (response.data) {
