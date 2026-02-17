@@ -17,10 +17,11 @@ import { IssueListItem } from "@/components/issue-list-item";
 import { filterCategories, filterStatuses } from "@/lib/mock/constants";
 import { useApp } from "@/components/app-context";
 import { getIssues } from "@/lib/services/issues";
+import { getUserVotes } from "@/lib/services/admin-issues";
 import type { DbIssue } from "@/types/db";
 
 export default function IssueListPage() {
-  const { role } = useApp();
+  const { role, user } = useApp();
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeStatus, setActiveStatus] = useState("All");
   const [search, setSearch] = useState("");
@@ -31,17 +32,26 @@ export default function IssueListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<DbIssue[]>([]);
+  const [userVotedIds, setUserVotedIds] = useState<string[]>([]);
 
   useEffect(() => {
     async function fetchIssues() {
       try {
         setLoading(true);
         setError(null);
-        const response = await getIssues();
+        const [response, votesRes] = await Promise.all([
+          getIssues(),
+          user
+            ? getUserVotes(user.id)
+            : Promise.resolve({ data: [] as string[], error: null }),
+        ]);
         if (response.error) {
           setError(response.error);
         } else if (response.data) {
           setIssues(response.data);
+        }
+        if (votesRes.data) {
+          setUserVotedIds(votesRes.data);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load issues");
@@ -50,7 +60,7 @@ export default function IssueListPage() {
       }
     }
     fetchIssues();
-  }, []);
+  }, [user]);
 
   const filtered = issues.filter((issue) => {
     // 1. Role-based visibility
@@ -73,13 +83,17 @@ export default function IssueListPage() {
       return false;
 
     // 3. Advanced toggles
-    if (filterMyUpvoted) return false; // TODO: Check user's votes from DB
-    // Mocking "Escalated" check - High > medium priority
+    if (filterMyUpvoted && !userVotedIds.includes(issue.id)) return false;
+    // Escalated = high or critical priority
     if (
       filterEscalated &&
       issue.priority !== "critical" &&
       issue.priority !== "high"
     )
+      return false;
+
+    // 4. Reporter filter (faculty view) — filter by visibility
+    if (filterReporter !== "All" && issue.visibility !== filterReporter)
       return false;
 
     return true;
@@ -149,17 +163,19 @@ export default function IssueListPage() {
           {/* Filters */}
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-3">
-              <Search
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search issues..."
-                className="w-full rounded-xl border border-border bg-card py-2.5 pl-10 pr-4 text-sm placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200 shadow-sm"
-              />
+              <div className="relative w-full">
+                <Search
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                  strokeWidth={1.5}
+                />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search issues..."
+                  className="w-full rounded-xl border border-border bg-card py-2.5 pl-10 pr-4 text-sm placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200 shadow-sm"
+                />
+              </div>
             </div>
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-card text-xs text-muted-foreground shadow-sm">
               <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -15,67 +15,146 @@ import {
   Users,
   Activity,
   Flag,
+  Loader,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 
 type AdminTab = "issues" | "users" | "logs" | "requests";
 import { AuditLog } from "@/components/audit-log";
 import { UserManagementTable } from "@/components/user-management-table";
-import { issues } from "@/lib/mock/issues";
 import { statusColors, priorityColors } from "@/lib/mock/constants";
-
-const stats = [
-  {
-    label: "Total Issues",
-    value: "156",
-    icon: FileText,
-    change: "+12 this week",
-    trend: "up",
-  },
-  {
-    label: "Pending",
-    value: "34",
-    icon: Clock,
-    change: "22% of total",
-    trend: "neutral",
-  },
-  {
-    label: "Overdue",
-    value: "8",
-    icon: AlertTriangle,
-    change: "Action required",
-    danger: true,
-    trend: "up",
-  },
-  {
-    label: "Resolved",
-    value: "114",
-    icon: CheckCircle,
-    change: "73% resolution rate",
-    success: true,
-    trend: "up",
-  },
-];
-
-const issueRows = issues.slice(0, 6).map((i) => ({
-  id: i.id,
-  title: i.title,
-  status: i.status,
-  priority: i.priority,
-  assigned: i.assigned,
-  date: i.date.replace(", 2026", ""),
-}));
+import {
+  getAllIssues,
+  getIssueFlagsForAdmin,
+  adminUpdateIssue,
+  deleteIssue,
+  addAuditLog,
+} from "@/lib/services/admin-issues";
+import { useApp } from "@/components/app-context";
+import type { DbIssue } from "@/types/db";
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<
-    "issues" | "users" | "logs" | "requests"
-  >("issues");
+  const { user } = useApp();
+  const [activeTab, setActiveTab] = useState<AdminTab>("issues");
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [issues, setIssues] = useState<DbIssue[]>([]);
+  const [flags, setFlags] = useState<any[]>([]);
 
-  const filteredRows = issueRows.filter(
-    (r) => !search || r.title.toLowerCase().includes(search.toLowerCase()),
-  );
+  // Fetch real data
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const [issueRes, flagRes] = await Promise.all([
+          getAllIssues(),
+          getIssueFlagsForAdmin(),
+        ]);
+        if (issueRes.data) setIssues(issueRes.data);
+        if (flagRes.data) setFlags(flagRes.data);
+      } catch (err) {
+        console.error("Admin fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  // Computed stats from real data
+  const stats = useMemo(() => {
+    const total = issues.length;
+    const pending = issues.filter(
+      (i) => i.status === "submitted" || i.status === "under_review",
+    ).length;
+    const resolved = issues.filter((i) => i.status === "resolved").length;
+    const inProgress = issues.filter((i) => i.status === "in_progress").length;
+    const resRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+
+    return [
+      {
+        label: "Total Issues",
+        value: String(total),
+        icon: FileText,
+        change: `${inProgress} in progress`,
+        trend: "up",
+      },
+      {
+        label: "Pending",
+        value: String(pending),
+        icon: Clock,
+        change:
+          total > 0 ? `${Math.round((pending / total) * 100)}% of total` : "0%",
+        trend: "neutral",
+      },
+      {
+        label: "Flagged",
+        value: String(flags.length),
+        icon: AlertTriangle,
+        change: flags.length > 0 ? "Action required" : "None",
+        danger: flags.length > 0,
+        trend: "up",
+      },
+      {
+        label: "Resolved",
+        value: String(resolved),
+        icon: CheckCircle,
+        change: `${resRate}% resolution rate`,
+        success: true,
+        trend: "up",
+      },
+    ];
+  }, [issues, flags]);
+
+  const filteredRows = useMemo(() => {
+    return issues.filter(
+      (r) => !search || r.title.toLowerCase().includes(search.toLowerCase()),
+    );
+  }, [issues, search]);
+
+  const handleApproveResolve = async (issueId: string) => {
+    const res = await adminUpdateIssue(issueId, { status: "resolved" });
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      toast.success("Issue resolved");
+      if (user)
+        await addAuditLog(
+          `Approved resolution for issue ${issueId.slice(0, 8)}`,
+          user.id,
+          "resolve",
+        );
+      setIssues((prev) =>
+        prev.map((i) =>
+          i.id === issueId ? { ...i, status: "resolved" as const } : i,
+        ),
+      );
+    }
+  };
+
+  const handleDeleteFlaggedIssue = async (issueId: string, flagId: string) => {
+    const res = await deleteIssue(issueId);
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      toast.success("False issue deleted");
+      if (user)
+        await addAuditLog(
+          `Deleted flagged issue ${issueId.slice(0, 8)}`,
+          user.id,
+          "system",
+        );
+      setIssues((prev) => prev.filter((i) => i.id !== issueId));
+      setFlags((prev) => prev.filter((f: any) => f.id !== flagId));
+    }
+  };
+
+  const handleRejectFlag = async (flagId: string) => {
+    toast.success("Flag rejected - issue remains active");
+    setFlags((prev) => prev.filter((f: any) => f.id !== flagId));
+  };
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto h-[calc(100vh-140px)] flex flex-col">
@@ -186,6 +265,9 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-3">
                 <LayoutList className="h-5 w-5 text-muted-foreground" />
                 <h2 className="text-sm font-semibold">Global Issue Tracker</h2>
+                <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+                  {issues.length} total
+                </span>
               </div>
               <div className="relative w-64">
                 <Search
@@ -202,90 +284,104 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="flex-1 overflow-auto">
-              <table className="w-full">
-                <thead className="bg-muted/30 sticky top-0 z-10 backdrop-blur-sm">
-                  <tr className="border-b border-border">
-                    <th className="px-5 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Issue
-                    </th>
-                    <th className="px-5 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-5 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Priority
-                    </th>
-                    <th className="px-5 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Assigned To
-                    </th>
-                    <th className="px-5 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-5 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/40">
-                  {filteredRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="hover:bg-muted/10 transition-colors group"
-                    >
-                      <td className="px-5 py-4">
-                        <div>
-                          <p className="text-sm font-medium truncate max-w-[280px] group-hover:text-primary transition-colors">
-                            {row.title}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            #{String(row.id).padStart(3, "0")} · Anonymous
-                            Student
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span
-                          className={cn(
-                            "px-2.5 py-1 rounded-full text-[10px] font-bold border",
-                            statusColors[row.status].replace(
-                              "text-",
-                              "border-transparent text-",
-                            ), // Adjust styles slightly for badges
-                          )}
-                        >
-                          {row.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span
-                          className={cn(
-                            "text-xs font-semibold",
-                            priorityColors[row.priority],
-                          )}
-                        >
-                          {row.priority}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="text-xs text-foreground bg-muted/40 px-2 py-1 rounded-md border border-border/50 w-fit">
-                          {row.assigned}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-xs text-muted-foreground">
-                        {row.date}
-                      </td>
-                      <td className="px-5 py-4">
-                        <Link
-                          href={`/issues/${row.id}`}
-                          className="flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          View
-                        </Link>
-                      </td>
+              {loading ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-muted/30 sticky top-0 z-10 backdrop-blur-sm">
+                    <tr className="border-b border-border">
+                      <th className="px-5 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Issue
+                      </th>
+                      <th className="px-5 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-5 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Priority
+                      </th>
+                      <th className="px-5 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Category
+                      </th>
+                      <th className="px-5 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Date
+                      </th>
+                      <th className="px-5 py-3 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Actions
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {filteredRows.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="hover:bg-muted/10 transition-colors group"
+                      >
+                        <td className="px-5 py-4">
+                          <div>
+                            <p className="text-sm font-medium truncate max-w-[280px] group-hover:text-primary transition-colors">
+                              {row.title}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              #{row.id.slice(0, 8)} · {row.location}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span
+                            className={cn(
+                              "px-2.5 py-1 rounded-full text-[10px] font-bold",
+                              statusColors[row.status.replace("_", " ")] ||
+                                "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            {row.status.replace("_", " ")}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span
+                            className={cn(
+                              "text-xs font-semibold",
+                              priorityColors[row.priority] ||
+                                "text-muted-foreground",
+                            )}
+                          >
+                            {row.priority}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="text-xs text-foreground bg-muted/40 px-2 py-1 rounded-md border border-border/50 w-fit">
+                            {row.category}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-xs text-muted-foreground">
+                          {row.created_at.split("T")[0]}
+                        </td>
+                        <td className="px-5 py-4">
+                          <Link
+                            href={`/issues/${row.id}`}
+                            className="flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            View
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredRows.length === 0 && !loading && (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-5 py-12 text-center text-sm text-muted-foreground"
+                        >
+                          No issues found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         )}
@@ -311,34 +407,47 @@ export default function AdminDashboard() {
                   <CheckCircle className="h-4 w-4 text-[var(--success)]" />{" "}
                   Resolution Approvals
                 </h3>
-                <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-sm font-bold">Hostel 1 Water Supply</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Reported fixed by Maintenance Team
-                      </p>
+                {issues
+                  .filter((i) => i.status === "in_progress")
+                  .slice(0, 5)
+                  .map((issue) => (
+                    <div
+                      key={issue.id}
+                      className="rounded-xl border border-border bg-card p-4 space-y-4"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-sm font-bold">{issue.title}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {issue.category} · {issue.location}
+                          </p>
+                        </div>
+                        <span className="text-[10px] bg-muted px-2 py-1 rounded">
+                          {issue.created_at.split("T")[0]}
+                        </span>
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={() => handleApproveResolve(issue.id)}
+                          className="flex-1 py-2 rounded-lg bg-[var(--success)]/10 text-[var(--success)] text-xs font-bold hover:bg-[var(--success)]/20 transition-colors"
+                        >
+                          Approve Resolve
+                        </button>
+                        <Link
+                          href={`/issues/${issue.id}`}
+                          className="flex-1 py-2 rounded-lg bg-muted text-muted-foreground text-xs font-bold hover:bg-muted/80 transition-colors text-center"
+                        >
+                          View Details
+                        </Link>
+                      </div>
                     </div>
-                    <span className="text-[10px] bg-muted px-2 py-1 rounded">
-                      2 hrs ago
-                    </span>
+                  ))}
+                {issues.filter((i) => i.status === "in_progress").length ===
+                  0 && (
+                  <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                    No pending resolution requests
                   </div>
-                  <div className="bg-muted/30 p-3 rounded-lg text-xs italic text-muted-foreground border border-border/50">
-                    &ldquo;Replaced the main valve controller. Water flow is
-                    normalized.&rdquo;
-                  </div>
-                  <div className="h-24 w-full bg-muted/50 rounded-lg flex items-center justify-center text-xs text-muted-foreground border border-dashed border-border">
-                    [Evidence Photo Placeholder]
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    <button className="flex-1 py-2 rounded-lg bg-[var(--success)]/10 text-[var(--success)] text-xs font-bold hover:bg-[var(--success)]/20 transition-colors">
-                      Approve
-                    </button>
-                    <button className="flex-1 py-2 rounded-lg bg-muted text-muted-foreground text-xs font-bold hover:bg-muted/80 transition-colors">
-                      Reject
-                    </button>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* False Reports */}
@@ -347,32 +456,52 @@ export default function AdminDashboard() {
                   <Flag className="h-4 w-4 text-destructive" /> False Issue
                   Reports
                 </h3>
-                <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-sm font-bold">Cafeteria Hygiene</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Flagged by Cafeteria Manager
-                      </p>
+                {flags.length === 0 ? (
+                  <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                    No flagged issues
+                  </div>
+                ) : (
+                  flags.map((flag: any) => (
+                    <div
+                      key={flag.id}
+                      className="rounded-xl border border-border bg-card p-4 space-y-4"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-sm font-bold">
+                            {flag.issues?.title ||
+                              `Issue ${flag.issue_id.slice(0, 8)}`}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Flagged · {flag.issues?.category || "Unknown"}
+                          </p>
+                        </div>
+                        <span className="text-[10px] bg-muted px-2 py-1 rounded">
+                          {new Date(flag.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="bg-destructive/5 p-3 rounded-lg text-xs italic text-destructive/80 border border-destructive/10">
+                        &ldquo;{flag.reason}&rdquo;
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={() =>
+                            handleDeleteFlaggedIssue(flag.issue_id, flag.id)
+                          }
+                          className="flex-1 py-2 rounded-lg bg-destructive/10 text-destructive text-xs font-bold hover:bg-destructive/20 transition-colors"
+                        >
+                          Confirm False (Delete)
+                        </button>
+                        <button
+                          onClick={() => handleRejectFlag(flag.id)}
+                          className="flex-1 py-2 rounded-lg bg-muted text-muted-foreground text-xs font-bold hover:bg-muted/80 transition-colors"
+                        >
+                          Reject Flag
+                        </button>
+                      </div>
                     </div>
-                    <span className="text-[10px] bg-muted px-2 py-1 rounded">
-                      5 hrs ago
-                    </span>
-                  </div>
-                  <div className="bg-destructive/5 p-3 rounded-lg text-xs italic text-destructive/80 border border-destructive/10">
-                    &ldquo;This report is malicious. We had a health inspection
-                    yesterday and passed with A++. See attached
-                    certificate.&rdquo;
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    <button className="flex-1 py-2 rounded-lg bg-destructive/10 text-destructive text-xs font-bold hover:bg-destructive/20 transition-colors">
-                      Confirm False (Delete)
-                    </button>
-                    <button className="flex-1 py-2 rounded-lg bg-muted text-muted-foreground text-xs font-bold hover:bg-muted/80 transition-colors">
-                      Reject Flag
-                    </button>
-                  </div>
-                </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

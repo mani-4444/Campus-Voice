@@ -1,12 +1,47 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Search, Plus, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { LocationTree, LocationNode } from "@/components/location-tree";
 import { LocationStats } from "@/components/location-stats";
 import { Skeleton } from "@/components/ui/skeleton";
 import { initialLocations } from "@/lib/mock/locations";
+import { getLocations, addLocation } from "@/lib/services/admin-issues";
+import { getIssues } from "@/lib/services/issues";
+import type { DbLocation, DbIssue } from "@/types/db";
+
+/** Transform flat DB locations into a tree of LocationNodes */
+function buildTree(locations: DbLocation[], issues: DbIssue[]): LocationNode[] {
+  // Count issues per location name
+  const issueCounts: Record<string, number> = {};
+  issues.forEach((i) => {
+    issueCounts[i.location] = (issueCounts[i.location] || 0) + 1;
+  });
+
+  const nodeMap = new Map<string, LocationNode>();
+  locations.forEach((loc) => {
+    nodeMap.set(loc.id, {
+      id: loc.id,
+      name: loc.name,
+      type: loc.type,
+      children: [],
+      issueCount: issueCounts[loc.name] || 0,
+    });
+  });
+
+  const roots: LocationNode[] = [];
+  locations.forEach((loc) => {
+    const node = nodeMap.get(loc.id)!;
+    if (loc.parent_id && nodeMap.has(loc.parent_id)) {
+      nodeMap.get(loc.parent_id)!.children!.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  return roots;
+}
 
 export default function LocationsPage() {
   const [search, setSearch] = useState("");
@@ -14,24 +49,55 @@ export default function LocationsPage() {
     null,
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [treeNodes, setTreeNodes] = useState<LocationNode[]>([]);
 
-  // Simulate loading
   useEffect(() => {
-    const timer = setTimeout(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      const [locRes, issuesRes] = await Promise.all([
+        getLocations(),
+        getIssues(),
+      ]);
+      const locations = locRes.data ?? [];
+      const issues = issuesRes.data ?? [];
+
+      if (locations.length > 0) {
+        const tree = buildTree(locations, issues);
+        setTreeNodes(tree);
+        setSelectedLocation(tree[0] ?? null);
+      } else {
+        // Fallback to mock data if DB has no locations
+        setTreeNodes(initialLocations);
+        setSelectedLocation(initialLocations[0]);
+      }
       setIsLoading(false);
-      setSelectedLocation(initialLocations[0]);
-    }, 1000);
-    return () => clearTimeout(timer);
+    }
+    fetchData();
   }, []);
 
-  const handleAddLocation = () => {
-    toast.success("Add Location Modal", {
-      description: "This feature would open a modal to add a new location.",
-      action: {
-        label: "Undo",
-        onClick: () => console.log("Undo"),
-      },
-    });
+  const handleAddLocation = async () => {
+    const name = prompt("Enter location name:");
+    if (!name) return;
+    const type = prompt(
+      "Enter type (campus, block, lab, hostel, facility):",
+      "block",
+    );
+    if (!type) return;
+    const res = await addLocation(name, type, selectedLocation?.id);
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      toast.success(`Location "${name}" added`);
+      // Refresh
+      const [locRes, issuesRes] = await Promise.all([
+        getLocations(),
+        getIssues(),
+      ]);
+      if (locRes.data && locRes.data.length > 0) {
+        const tree = buildTree(locRes.data, issuesRes.data ?? []);
+        setTreeNodes(tree);
+      }
+    }
   };
 
   return (
@@ -84,7 +150,7 @@ export default function LocationsPage() {
               </div>
             ) : (
               <LocationTree
-                nodes={initialLocations}
+                nodes={treeNodes}
                 selectedId={selectedLocation?.id || null}
                 onSelect={setSelectedLocation}
               />

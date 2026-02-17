@@ -17,8 +17,10 @@ import { StepCategoryLocation } from "./step-category-location";
 import { StepDetails } from "./step-details";
 import { StepReview } from "./step-review";
 import { createIssue } from "@/lib/services/issues";
+import { useApp } from "@/components/app-context";
 
 export default function ReportIssuePage() {
+  const { role } = useApp();
   const [step, setStep] = useState(1);
   const [category, setCategory] = useState("");
   const [location, setLocation] = useState("");
@@ -52,6 +54,12 @@ export default function ReportIssuePage() {
         category,
         location,
         status: "submitted",
+        visibility:
+          role === "faculty"
+            ? "faculty"
+            : role === "admin"
+              ? "public"
+              : "student",
       });
 
       if (response.error) {

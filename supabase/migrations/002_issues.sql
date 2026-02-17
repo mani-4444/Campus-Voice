@@ -289,6 +289,12 @@ create policy "Admins can update issues"
   using  (public.is_admin())
   with check (public.is_admin());
 
+-- 10d  DELETE: only admins can delete issues
+drop policy if exists "Admins can delete issues" on public.issues;
+create policy "Admins can delete issues"
+  on public.issues for delete
+  using (public.is_admin());
+
 
 -- ────────────────────────────────────────────────
 -- 11.  RLS — issue_updates
@@ -311,6 +317,13 @@ drop policy if exists "Admins can insert issue updates" on public.issue_updates;
 create policy "Admins can insert issue updates"
   on public.issue_updates for insert
   with check (public.is_admin());
+
+-- 11c  INSERT: any authenticated user can add updates as themselves
+--      (needed for faculty escalation notes, student resolution requests, etc.)
+drop policy if exists "Authenticated users can insert own updates" on public.issue_updates;
+create policy "Authenticated users can insert own updates"
+  on public.issue_updates for insert
+  with check (auth.uid() = created_by);
 
 
 -- ────────────────────────────────────────────────
@@ -358,6 +371,12 @@ create policy "Users can insert own flags"
   on public.issue_flags for insert
   with check (auth.uid() = flagged_by);
 
+-- 13d DELETE: admins can delete flags (dismiss false reports)
+drop policy if exists "Admins can delete flags" on public.issue_flags;
+create policy "Admins can delete flags"
+  on public.issue_flags for delete
+  using (public.is_admin());
+
 
 -- ────────────────────────────────────────────────
 -- 14. RLS — locations (read-only for authenticated, admin can manage)
@@ -389,6 +408,13 @@ create policy "Admins can insert audit logs"
   on public.audit_logs for insert
   with check (public.is_admin());
 
+-- Allow any authenticated user to insert audit logs as themselves
+-- (needed for faculty escalation logging)
+drop policy if exists "Authenticated users can insert own audit logs" on public.audit_logs;
+create policy "Authenticated users can insert own audit logs"
+  on public.audit_logs for insert
+  with check (auth.uid() = admin_id);
+
 
 -- ════════════════════════════════════════════════
 --  INDEXES
@@ -415,6 +441,6 @@ create index if not exists idx_audit_logs_created  on public.audit_logs(created_
 --   View     : issues_public  (excludes created_by for anonymity)
 --   Functions: is_admin(), set_updated_at(), update_vote_count()
 --   Triggers : trg_issues_updated_at, trg_vote_count_insert, trg_vote_count_delete
---   RLS      : 16 policies across 6 tables
+--   RLS      : 20 policies across 6 tables
 --   Indexes  : 11 performance indexes
 -- ================================================================

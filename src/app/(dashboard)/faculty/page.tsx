@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useMemo } from "react";
 import {
   FileText,
   Clock,
@@ -7,53 +8,140 @@ import {
   ArrowUpRight,
   Sparkles,
   Users,
+  Loader,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { FacultyActionItems } from "@/components/faculty-action-items";
 import { AnalyticsCharts } from "@/components/analytics-charts";
 import Link from "next/link";
-import { sentimentData, departmentData } from "@/lib/mock/analytics";
-
-const stats = [
-  {
-    label: "Active Issues",
-    value: "23",
-    icon: FileText,
-    change: "+5 this week",
-    trend: "up",
-    neutral: false,
-  },
-  {
-    label: "Avg Resolution",
-    value: "4.2d",
-    icon: Clock,
-    change: "-0.8d faster",
-    trend: "down",
-    neutral: false,
-    success: true,
-  },
-  {
-    label: "Feedback Score",
-    value: "4.8/5",
-    icon: Users,
-    change: "Top 10%",
-    trend: "up",
-    neutral: false,
-    success: true,
-  },
-  {
-    label: "Escalations",
-    value: "3",
-    icon: AlertTriangle,
-    change: "Action required",
-    trend: "up",
-    neutral: false,
-    danger: true,
-  },
-];
+import { useApp } from "@/components/app-context";
+import {
+  getAssignedIssues,
+  getHighPriorityIssues,
+} from "@/lib/services/faculty-issues";
+import { getIssues } from "@/lib/services/issues";
+import type { DbIssue } from "@/types/db";
 
 export default function FacultyDashboard() {
+  const { user } = useApp();
+  const [allIssues, setAllIssues] = useState<DbIssue[]>([]);
+  const [assignedIssues, setAssignedIssues] = useState<DbIssue[]>([]);
+  const [highPriority, setHighPriority] = useState<DbIssue[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      const [allRes, assignedRes, hpRes] = await Promise.all([
+        getIssues(),
+        user
+          ? getAssignedIssues(user.id)
+          : Promise.resolve({ data: [] as DbIssue[], error: null }),
+        getHighPriorityIssues(),
+      ]);
+      if (allRes.data) setAllIssues(allRes.data);
+      if (assignedRes.data) setAssignedIssues(assignedRes.data);
+      if (hpRes.data) setHighPriority(hpRes.data);
+      setLoading(false);
+    }
+    fetchData();
+  }, [user]);
+
+  const stats = useMemo(() => {
+    const active = allIssues.filter(
+      (i) => i.status !== "resolved" && i.status !== "rejected",
+    ).length;
+    const resolved = allIssues.filter((i) => i.status === "resolved");
+    // Avg resolution time (days between created and updated for resolved issues)
+    let avgDays = 0;
+    if (resolved.length > 0) {
+      const totalDays = resolved.reduce((sum, i) => {
+        const created = new Date(i.created_at).getTime();
+        const updated = new Date(i.updated_at).getTime();
+        return sum + (updated - created) / (1000 * 60 * 60 * 24);
+      }, 0);
+      avgDays = totalDays / resolved.length;
+    }
+    const escalations = highPriority.length;
+
+    return [
+      {
+        label: "Active Issues",
+        value: String(active),
+        icon: FileText,
+        change: `${assignedIssues.length} assigned to you`,
+        trend: "up" as const,
+        neutral: false,
+      },
+      {
+        label: "Avg Resolution",
+        value: `${avgDays.toFixed(1)}d`,
+        icon: Clock,
+        change: `${resolved.length} resolved`,
+        trend: "down" as const,
+        neutral: false,
+        success: true,
+      },
+      {
+        label: "Total Issues",
+        value: String(allIssues.length),
+        icon: Users,
+        change: `${allIssues.filter((i) => i.status === "in_progress").length} in progress`,
+        trend: "up" as const,
+        neutral: false,
+        success: true,
+      },
+      {
+        label: "Escalations",
+        value: String(escalations),
+        icon: AlertTriangle,
+        change: escalations > 0 ? "Action required" : "All clear",
+        trend: "up" as const,
+        neutral: false,
+        danger: escalations > 0,
+      },
+    ];
+  }, [allIssues, assignedIssues, highPriority]);
+
+  // Compute department data from real issues
+  const departmentData = useMemo(() => {
+    const byCategory: Record<string, number> = {};
+    allIssues.forEach((i) => {
+      byCategory[i.category] = (byCategory[i.category] || 0) + 1;
+    });
+    return Object.entries(byCategory).map(([dept, issues]) => ({
+      dept,
+      issues,
+    }));
+  }, [allIssues]);
+
+  // Compute sentiment data from status distribution
+  const sentimentData = useMemo(() => {
+    const resolved = allIssues.filter((i) => i.status === "resolved").length;
+    const pending = allIssues.filter(
+      (i) => i.status === "submitted" || i.status === "under_review",
+    ).length;
+    const inProgress = allIssues.filter(
+      (i) => i.status === "in_progress" || i.status === "rejected",
+    ).length;
+    return [
+      { name: "Resolved", value: resolved || 1, color: "#3FB97C" },
+      { name: "Pending", value: pending || 1, color: "#00F5D4" },
+      { name: "In Progress", value: inProgress || 1, color: "#EF4444" },
+    ];
+  }, [allIssues]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">
+          Loading faculty dashboard...
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
       {/* Header */}

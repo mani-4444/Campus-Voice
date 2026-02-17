@@ -29,6 +29,17 @@ import {
   getIssueAdminUpdates,
   toggleUpvote,
 } from "@/lib/services/issues";
+import {
+  flagIssue,
+  addAuditLog,
+  getUserVotes,
+  adminUpdateIssue,
+  addAdminNote,
+} from "@/lib/services/admin-issues";
+import {
+  addFacultyUpdate,
+  updateIssueStatus,
+} from "@/lib/services/faculty-issues";
 import { useApp } from "@/components/app-context";
 import type { DbIssue, DbIssueUpdate } from "@/types/db";
 
@@ -78,6 +89,14 @@ export default function IssueDetailPage() {
 
         if (timelineRes.data) setTimeline(timelineRes.data);
         if (updatesRes.data) setAdminUpdates(updatesRes.data);
+
+        // Check if user already upvoted
+        if (user) {
+          const votesRes = await getUserVotes(user.id);
+          if (votesRes.data && votesRes.data.includes(issueId)) {
+            setUpvoted(true);
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load issue");
       } finally {
@@ -91,7 +110,7 @@ export default function IssueDetailPage() {
   const currentUserId = user?.id ?? "";
   const isIssueOwner = issue?.created_by === currentUserId;
   const canUpvote = role !== "admin";
-  const canResolve = role === "admin" || isIssueOwner;
+  const canResolve = role === "admin" || role === "faculty" || isIssueOwner;
 
   const handleUpvote = async () => {
     if (!issue || upvoting) return;
@@ -104,7 +123,13 @@ export default function IssueDetailPage() {
         toast.error(response.error);
       } else {
         setUpvoted(newState);
-        setUpvoteCount(newState ? upvoteCount + 1 : upvoteCount - 1);
+        // Re-fetch issue to get accurate upvote count from DB trigger
+        const refreshed = await getIssueById(issueId);
+        if (refreshed.data) {
+          setUpvoteCount(refreshed.data.upvotes);
+        } else {
+          setUpvoteCount(newState ? upvoteCount + 1 : upvoteCount - 1);
+        }
         toast.success(newState ? "Issue upvoted" : "Upvote removed");
       }
     } catch (err) {
@@ -343,10 +368,22 @@ export default function IssueDetailPage() {
                   className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
                 <button
-                  onClick={() => {
-                    if (!adminUpdateText) return;
-                    toast.success("Update posted to timeline");
-                    setAdminUpdateText("");
+                  onClick={async () => {
+                    if (!adminUpdateText || !user) return;
+                    const res = await addAdminNote(
+                      issueId,
+                      user.id,
+                      adminUpdateText,
+                    );
+                    if (res.error) {
+                      toast.error(res.error);
+                    } else {
+                      toast.success("Update posted to timeline");
+                      setAdminUpdateText("");
+                      // Refresh admin updates
+                      const updatesRes = await getIssueAdminUpdates(issueId);
+                      if (updatesRes.data) setAdminUpdates(updatesRes.data);
+                    }
                   }}
                   className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors"
                 >
@@ -389,7 +426,31 @@ export default function IssueDetailPage() {
         )}
         {role === "faculty" && !isIssueOwner && (
           <button
-            onClick={() => toast.success("Issue escalated to Administration")}
+            onClick={async () => {
+              if (!user) return;
+              const updateRes = await adminUpdateIssue(issueId, {
+                priority: "critical",
+              });
+              if (updateRes.error) {
+                toast.error(updateRes.error);
+              } else {
+                await addFacultyUpdate(
+                  issueId,
+                  user.id,
+                  "Issue escalated to administration",
+                  "critical",
+                );
+                await addAuditLog(
+                  `Issue #${issueId.slice(0, 8)} escalated by faculty`,
+                  user.id,
+                  "escalate",
+                );
+                toast.success("Issue escalated to Administration");
+                // Refresh issue data
+                const issueRes = await getIssueById(issueId);
+                if (issueRes.data) setIssue(issueRes.data);
+              }
+            }}
             className="flex items-center gap-2 rounded-xl border border-[var(--warning)]/50 bg-[var(--warning)]/10 text-[var(--warning)] px-4 py-2.5 text-sm font-bold hover:bg-[var(--warning)]/20 transition-all duration-200"
           >
             <AlertTriangle className="h-4 w-4" strokeWidth={2} />
@@ -434,8 +495,14 @@ export default function IssueDetailPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    toast.success("Request submitted to Admin Queue");
+                  onClick={async () => {
+                    if (!falseReason.trim() || !user) return;
+                    const res = await flagIssue(issueId, user.id, falseReason);
+                    if (res.error) {
+                      toast.error(res.error);
+                    } else {
+                      toast.success("False report submitted to Admin Queue");
+                    }
                     setShowReportFalse(false);
                     setFalseReason("");
                   }}
@@ -502,8 +569,46 @@ export default function IssueDetailPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    toast.success("Resolution evidence submitted for approval");
+                  onClick={async () => {
+                    if (!user) return;
+                    // If admin, resolve directly. Otherwise request approval.
+                    if (role === "admin") {
+                      const res = await adminUpdateIssue(issueId, {
+                        status: "resolved",
+                      });
+                      if (res.error) {
+                        toast.error(res.error);
+                      } else {
+                        await addAdminNote(
+                          issueId,
+                          user.id,
+                          `Resolved: ${resolveNote}`,
+                        );
+                        await addAuditLog(
+                          `Issue #${issueId.slice(0, 8)} resolved`,
+                          user.id,
+                          "resolve",
+                        );
+                        toast.success("Issue marked as resolved");
+                        const issueRes = await getIssueById(issueId);
+                        if (issueRes.data) setIssue(issueRes.data);
+                      }
+                    } else {
+                      // Faculty or issue owner: submit resolution request (set to in_progress as pending approval)
+                      const res = await addFacultyUpdate(
+                        issueId,
+                        user.id,
+                        `Resolution submitted: ${resolveNote}`,
+                        "update",
+                      );
+                      if (res.error) {
+                        toast.error(res.error);
+                      } else {
+                        toast.success(
+                          "Resolution evidence submitted for approval",
+                        );
+                      }
+                    }
                     setShowResolve(false);
                     setResolveNote("");
                   }}

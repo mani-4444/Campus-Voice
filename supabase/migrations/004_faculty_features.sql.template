@@ -1,0 +1,42 @@
+-- ══════════════════════════════════════════════════════════════
+-- Faculty-Specific Features Migration
+-- Person 2 (Faculty Dashboard Developer): Edit this file
+-- ══════════════════════════════════════════════════════════════
+-- 
+-- INSTRUCTIONS:
+-- 1. Rename this file to remove ".template" extension
+-- 2. Add your faculty-specific tables/columns below
+-- 3. Run this migration in Supabase Dashboard → SQL Editor
+-- 4. Commit and push to your branch
+--
+-- ══════════════════════════════════════════════════════════════
+
+-- Example: Add faculty departments table
+-- CREATE TABLE IF NOT EXISTS public.faculty_departments (
+--   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--   name TEXT NOT NULL,
+--   head_user_id UUID REFERENCES auth.users(id),
+--   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+-- );
+
+-- Example: Add columns to issues table
+-- ALTER TABLE public.issues
+--   ADD COLUMN IF NOT EXISTS department_id UUID REFERENCES public.faculty_departments(id);
+
+-- Example: Add RLS policies
+-- ALTER TABLE public.faculty_departments ENABLE ROW LEVEL SECURITY;
+-- 
+-- CREATE POLICY "Faculty can view departments"
+--   ON public.faculty_departments
+--   FOR SELECT
+--   TO authenticated
+--   USING (true);
+
+-- Example: Add index
+-- CREATE INDEX idx_issues_department_id 
+--   ON public.issues(department_id);
+
+
+-- ══════════════════════════════════════════════════════════════
+-- Add your faculty-specific migrations below this line
+-- ══════════════════════════════════════════════════════════════
