@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   FileText,
   ThumbsUp,
@@ -24,57 +24,42 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { chartData, recentActivity } from "@/lib/mock/analytics";
 import { statusColors, priorityColors } from "@/lib/mock/constants";
-import { getIssues } from "@/lib/services/issues";
-import type { DbIssue } from "@/types/db";
-
-const stats = [
-  {
-    label: "Total Reported",
-    value: "12",
-    icon: FileText,
-    change: "+3 this week",
-    trend: "up",
-  },
-  {
-    label: "Upvoted Issues",
-    value: "8",
-    icon: ThumbsUp,
-    change: "+2 this week",
-    trend: "up",
-  },
-  {
-    label: "Resolved",
-    value: "5",
-    icon: CheckCircle,
-    change: "42% rate",
-    trend: "neutral",
-  },
-  {
-    label: "Pending",
-    value: "7",
-    icon: Clock,
-    change: "3 under review",
-    trend: "neutral",
-  },
-];
+import { getStudentIssues } from "@/lib/services/student-issues";
+import { useApp } from "@/components/app-context";
+import type { DbIssue, DbIssueUpdate } from "@/types/db";
+import { createClient } from "@/lib/supabase/client";
 
 export default function StudentDashboard() {
+  const { user } = useApp();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [trendingIssues, setTrendingIssues] = useState<DbIssue[]>([]);
+  const [allIssues, setAllIssues] = useState<DbIssue[]>([]);
+  const [recentUpdates, setRecentUpdates] = useState<DbIssueUpdate[]>([]);
 
   useEffect(() => {
-    async function fetchTrendingIssues() {
+    async function fetchData() {
       try {
         setLoading(true);
         setError(null);
-        const response = await getIssues();
+        const response = await getStudentIssues();
         if (response.error) {
           setError(response.error);
         } else if (response.data) {
-          setTrendingIssues(response.data.slice(0, 5));
+          setAllIssues(response.data);
+        }
+
+        // Fetch recent activity from issue_updates
+        try {
+          const supabase = createClient();
+          const { data: updates } = await supabase
+            .from("issue_updates")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(5);
+          if (updates) setRecentUpdates(updates as DbIssueUpdate[]);
+        } catch {
+          // Non-critical, ignore
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load issues");
@@ -83,8 +68,109 @@ export default function StudentDashboard() {
       }
     }
 
-    fetchTrendingIssues();
+    fetchData();
   }, []);
+
+  const trendingIssues = useMemo(
+    () => [...allIssues].sort((a, b) => b.upvotes - a.upvotes).slice(0, 5),
+    [allIssues],
+  );
+
+  // Compute real stats from fetched issues
+  const stats = useMemo(() => {
+    const total = allIssues.length;
+    const resolved = allIssues.filter((i) => i.status === "resolved").length;
+    const pending = allIssues.filter(
+      (i) => i.status !== "resolved" && i.status !== "rejected",
+    ).length;
+    const underReview = allIssues.filter(
+      (i) => i.status === "under_review",
+    ).length;
+    const totalUpvotes = allIssues.reduce((sum, i) => sum + i.upvotes, 0);
+    const resRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+
+    return [
+      {
+        label: "Total Reported",
+        value: String(total),
+        icon: FileText,
+        change: `${pending} active`,
+        trend: "up",
+      },
+      {
+        label: "Total Upvotes",
+        value: String(totalUpvotes),
+        icon: ThumbsUp,
+        change: `across ${total} issues`,
+        trend: "up",
+      },
+      {
+        label: "Resolved",
+        value: String(resolved),
+        icon: CheckCircle,
+        change: `${resRate}% rate`,
+        trend: "neutral",
+      },
+      {
+        label: "Pending",
+        value: String(pending),
+        icon: Clock,
+        change: `${underReview} under review`,
+        trend: "neutral",
+      },
+    ];
+  }, [allIssues]);
+
+  // Compute chart data from real issues (group by month)
+  const chartData = useMemo(() => {
+    const monthCounts: Record<string, number> = {};
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    // Initialize last 6 months
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${months[d.getMonth()]}`;
+      monthCounts[key] = 0;
+    }
+    allIssues.forEach((issue) => {
+      const d = new Date(issue.created_at);
+      const key = `${months[d.getMonth()]}`;
+      if (key in monthCounts) monthCounts[key]++;
+    });
+    return Object.entries(monthCounts).map(([month, issues]) => ({
+      month,
+      issues,
+    }));
+  }, [allIssues]);
+
+  // Format recent activity
+  const recentActivity = useMemo(() => {
+    return recentUpdates.map((u) => {
+      const date = new Date(u.created_at);
+      const diff = Date.now() - date.getTime();
+      const hours = Math.floor(diff / 3600000);
+      const timeStr =
+        hours < 1
+          ? "Just now"
+          : hours < 24
+            ? `${hours}h ago`
+            : `${Math.floor(hours / 24)}d ago`;
+      return { text: u.message, time: timeStr };
+    });
+  }, [recentUpdates]);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
@@ -320,6 +406,11 @@ export default function StudentDashboard() {
           <h2 className="text-sm font-semibold">Recent Activity</h2>
         </div>
         <div className="space-y-3">
+          {recentActivity.length === 0 && !loading && (
+            <p className="text-sm text-muted-foreground/50 text-center py-4">
+              No recent activity yet
+            </p>
+          )}
           {recentActivity.map((item, i) => (
             <div key={i} className="flex items-center gap-3 py-2">
               <div className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />

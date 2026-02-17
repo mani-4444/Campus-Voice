@@ -1,0 +1,52 @@
+-- ══════════════════════════════════════════════════════════════
+-- Admin-Specific Features Migration
+-- Person 3 (Admin Dashboard Developer): Edit this file
+-- ══════════════════════════════════════════════════════════════
+-- 
+-- INSTRUCTIONS:
+-- 1. Rename this file to remove ".template" extension
+-- 2. Add your admin-specific tables/columns below
+-- 3. Run this migration in Supabase Dashboard → SQL Editor
+-- 4. Commit and push to your branch
+--
+-- ══════════════════════════════════════════════════════════════
+
+-- Example: Add admin permissions table
+-- CREATE TABLE IF NOT EXISTS public.admin_permissions (
+--   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+--   permission_type TEXT NOT NULL,
+--   granted_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+-- );
+
+-- Example: Add system settings table
+-- CREATE TABLE IF NOT EXISTS public.system_settings (
+--   key TEXT PRIMARY KEY,
+--   value JSONB NOT NULL,
+--   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--   updated_by UUID REFERENCES auth.users(id)
+-- );
+
+-- Example: Add RLS policies
+-- ALTER TABLE public.admin_permissions ENABLE ROW LEVEL SECURITY;
+-- 
+-- CREATE POLICY "Only admins can view permissions"
+--   ON public.admin_permissions
+--   FOR SELECT
+--   TO authenticated
+--   USING (
+--     EXISTS (
+--       SELECT 1 FROM public.profiles
+--       WHERE profiles.id = auth.uid()
+--       AND profiles.role = 'admin'
+--     )
+--   );
+
+-- Example: Add index
+-- CREATE INDEX idx_admin_permissions_user_id 
+--   ON public.admin_permissions(user_id);
+
+
+-- ══════════════════════════════════════════════════════════════
+-- Add your admin-specific migrations below this line
+-- ══════════════════════════════════════════════════════════════
