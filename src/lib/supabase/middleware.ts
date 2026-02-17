@@ -31,9 +31,14 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: Do not use getSession() — it reads from storage only.
   // getUser() makes a network call to verify the token.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    // Supabase unreachable or misconfigured — treat as unauthenticated
+    user = null;
+  }
 
   const { pathname } = request.nextUrl;
 
@@ -55,8 +60,6 @@ export async function updateSession(request: NextRequest) {
   // Redirect authenticated users away from login
   if (user && pathname === "/login") {
     const url = request.nextUrl.clone();
-    // We can't easily know the role here without querying,
-    // so redirect to a generic dashboard entry point
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
